@@ -9,9 +9,9 @@ import sys
 from sqlalchemy import text
 
 from db.session import engine, AsyncSessionLocal
-from models import Base
+from models.base import Base
 from models.admin import Admin
-from core.security import get_password_hash
+from core.security import hash_password
 from core.permissions import AdminRole
 
 
@@ -30,19 +30,19 @@ async def init_database():
     async with AsyncSessionLocal() as session:
         # 检查是否已存在管理员
         result = await session.execute(
-            text("SELECT COUNT(*) FROM admins")
+            text("SELECT COUNT(*) FROM platform_admins")
         )
         count = result.scalar()
         
         if count == 0:
             # 创建超级管理员
             super_admin = Admin(
+                admin_id="admin_001",
                 username="admin",
                 email="admin@example.com",
-                hashed_password=get_password_hash("admin123456"),
-                full_name="超级管理员",
+                password_hash=hash_password("admin123456"),
                 role=AdminRole.SUPER_ADMIN,
-                is_active=True
+                status="active"
             )
             session.add(super_admin)
             await session.commit()

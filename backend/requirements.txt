@@ -22,6 +22,7 @@ email-validator==2.1.0
 # Authentication & Security
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
 python-multipart==0.0.6
 cryptography==42.0.0
 
@@ -31,7 +32,7 @@ langchain-openai==0.0.5
 langchain-anthropic==0.1.1
 langchain-community==0.0.17
 langgraph==0.0.20
-langsmith==0.0.77
+langsmith>=0.0.83,<0.1
 
 # Vector Database
 pymilvus==2.3.5
@@ -66,7 +67,7 @@ mypy==1.8.0
 isort==5.13.2
 
 # Payment
-python-alipay-sdk==3.6.0
+python-alipay-sdk==3.4.0
 
 # Utilities
 python-dotenv==1.0.0

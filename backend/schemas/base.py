@@ -2,7 +2,7 @@
 基础 Schema
 """
 from datetime import datetime
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
@@ -21,7 +21,7 @@ class ApiResponse(BaseModel, Generic[T]):
     success: bool = True
     data: T | None = None
     error: dict[str, str] | None = None
-    meta: dict[str, any] | None = None
+    meta: dict[str, Any] | None = None
 
 
 class PaginatedResponse(BaseModel, Generic[T]):

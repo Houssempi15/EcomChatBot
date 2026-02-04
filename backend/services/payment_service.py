@@ -13,7 +13,7 @@ from typing import Dict, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.exceptions import BusinessException
+from core.exceptions import PaymentException, TenantNotFoundException, ResourceNotFoundException
 from models.payment import (
     OrderStatus,
     PaymentChannel,
@@ -115,9 +115,9 @@ class PaymentService:
             tenant_stmt = select(Tenant).where(Tenant.id == tenant_id)
             tenant_result = await self.db.execute(tenant_stmt)
             tenant = tenant_result.scalar_one_or_none()
-            
+
             if not tenant:
-                raise BusinessException(404, "租户不存在")
+                raise TenantNotFoundException(str(tenant_id))
             
             # 计算订单金额
             amount = self.calculate_amount(plan_type, duration_months)
@@ -173,13 +173,13 @@ class PaymentService:
             )
             
             return order, payment_html
-            
-        except BusinessException:
+
+        except (TenantNotFoundException, PaymentException):
             raise
         except Exception as e:
             await self.db.rollback()
             logger.error(f"Error creating payment order: {e}")
-            raise BusinessException(500, f"创建支付订单失败: {str(e)}")
+            raise PaymentException(f"创建支付订单失败: {str(e)}")
 
     async def handle_alipay_notify(self, notify_data: Dict[str, str]) -> bool:
         """
@@ -422,19 +422,19 @@ class PaymentService:
             stmt = select(PaymentOrder).where(PaymentOrder.order_number == order_number)
             result = await self.db.execute(stmt)
             order = result.scalar_one_or_none()
-            
+
             if not order:
-                raise BusinessException(404, "订单不存在")
-            
+                raise ResourceNotFoundException("订单", order_number)
+
             if order.status != OrderStatus.PAID:
-                raise BusinessException(400, "订单未支付，无法退款")
-            
+                raise PaymentException("订单未支付，无法退款")
+
             # 默认全额退款
             if refund_amount is None:
                 refund_amount = order.amount
-            
+
             if refund_amount > order.amount:
-                raise BusinessException(400, "退款金额不能大于订单金额")
+                raise PaymentException("退款金额不能大于订单金额")
             
             # 调用支付宝退款接口
             refund_result = self.alipay_client.refund(
@@ -443,10 +443,10 @@ class PaymentService:
                 refund_reason=refund_reason,
                 trade_no=order.trade_no,
             )
-            
+
             if not refund_result:
-                raise BusinessException(500, "退款失败")
-            
+                raise PaymentException("退款失败")
+
             # 更新订单状态
             if refund_amount >= order.amount:
                 order.status = OrderStatus.REFUNDED
@@ -481,10 +481,10 @@ class PaymentService:
                 "refund_amount": float(refund_amount),
                 "message": "退款成功",
             }
-            
-        except BusinessException:
+
+        except (PaymentException, ResourceNotFoundException):
             raise
         except Exception as e:
             await self.db.rollback()
             logger.error(f"Error processing refund: {e}")
-            raise BusinessException(500, f"退款失败: {str(e)}")
+            raise PaymentException(f"退款失败: {str(e)}")

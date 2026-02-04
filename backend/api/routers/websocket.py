@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.exceptions import AuthenticationError, QuotaExceededError
+from core.exceptions import AuthenticationException, QuotaExceededException
 from core.security import verify_api_key
 from db.session import get_db
 from services import (
@@ -34,11 +34,11 @@ async def verify_websocket_auth(api_key: str, db: AsyncSession) -> str:
         tenant_id
         
     Raises:
-        AuthenticationError: 认证失败
+        AuthenticationException: 认证失败
     """
     tenant = await verify_api_key(db, api_key)
     if not tenant or not tenant.is_active:
-        raise AuthenticationError("认证失败或租户未激活")
+        raise AuthenticationException("认证失败或租户未激活")
 
     return tenant.tenant_id
 
@@ -165,7 +165,7 @@ async def websocket_chat_endpoint(
                     tenant_id, conversation_id, f"处理失败: {str(e)}"
                 )
 
-    except AuthenticationError as e:
+    except AuthenticationException as e:
         await websocket.close(code=1008, reason=str(e))
         return
 
@@ -282,7 +282,7 @@ async def handle_chat_message(
             },
         )
 
-    except QuotaExceededError as e:
+    except QuotaExceededException as e:
         await connection_manager.send_error(
             tenant_id, conversation_id, str(e), "QUOTA_EXCEEDED"
         )

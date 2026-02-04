@@ -1,7 +1,7 @@
 """
 管理员 API 路由（平台管理）
 """
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
 from api.dependencies import AdminDep, DBDep, require_admin_permission
 from core import AdminRole, Permission, create_access_token
@@ -112,7 +112,7 @@ async def get_tenant(
 @router.post(
     "/tenants",
     response_model=ApiResponse[TenantWithAPIKey],
-    dependencies=[require_admin_permission(Permission.TENANT_CREATE)],
+    dependencies=[Depends(require_admin_permission(Permission.TENANT_CREATE))],
 )
 async def create_tenant(
     tenant_data: TenantCreate,
@@ -150,7 +150,7 @@ async def create_tenant(
 @router.put(
     "/tenants/{tenant_id}/status",
     response_model=ApiResponse[TenantResponse],
-    dependencies=[require_admin_permission(Permission.TENANT_SUSPEND)],
+    dependencies=[Depends(require_admin_permission(Permission.TENANT_SUSPEND))],
 )
 async def update_tenant_status(
     tenant_id: str,
@@ -191,7 +191,7 @@ async def update_tenant_status(
 @router.post(
     "/tenants/{tenant_id}/assign-plan",
     response_model=ApiResponse[dict],
-    dependencies=[require_admin_permission(Permission.SUBSCRIPTION_UPDATE)],
+    dependencies=[Depends(require_admin_permission(Permission.SUBSCRIPTION_UPDATE))],
 )
 async def assign_plan(
     tenant_id: str,
@@ -227,7 +227,7 @@ async def assign_plan(
 @router.post(
     "/tenants/{tenant_id}/adjust-quota",
     response_model=ApiResponse[dict],
-    dependencies=[require_admin_permission(Permission.QUOTA_ADJUST)],
+    dependencies=[Depends(require_admin_permission(Permission.QUOTA_ADJUST))],
 )
 async def adjust_quota(
     tenant_id: str,
@@ -266,7 +266,7 @@ async def adjust_quota(
 @router.post(
     "/tenants/batch-operation",
     response_model=ApiResponse[BatchOperationResponse],
-    dependencies=[require_admin_permission(Permission.TENANT_UPDATE)],
+    dependencies=[Depends(require_admin_permission(Permission.TENANT_UPDATE))],
 )
 async def batch_operation(
     batch_data: BatchOperationRequest,

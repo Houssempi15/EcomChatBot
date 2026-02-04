@@ -142,7 +142,7 @@ class PaymentOrder(BaseModel):
     
     # 索引
     __table_args__ = (
-        Index('idx_tenant_status', 'tenant_id', 'status'),
+        Index('idx_payment_orders_tenant_status', 'tenant_id', 'status'),
         Index('idx_order_created_at', 'created_at'),
         {'comment': '支付订单表'}
     )
