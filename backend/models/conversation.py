@@ -3,7 +3,7 @@
 """
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, Index, Integer, String, Text
+from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.base import TenantBaseModel
@@ -73,7 +73,7 @@ class Conversation(TenantBaseModel):
     )
 
     # 用户信息
-    user_id: Mapped[int] = mapped_column(Integer, nullable=False, comment="用户ID")
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, comment="用户ID")
 
     # 渠道信息
     channel: Mapped[str] = mapped_column(
@@ -87,7 +87,7 @@ class Conversation(TenantBaseModel):
 
     # 时间信息
     start_time: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default="CURRENT_TIMESTAMP", comment="开始时间"
+        DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"), comment="开始时间"
     )
     end_time: Mapped[datetime | None] = mapped_column(DateTime, comment="结束时间")
 
@@ -132,7 +132,7 @@ class Message(TenantBaseModel):
         String(64), unique=True, nullable=False, comment="消息ID"
     )
     conversation_id: Mapped[str] = mapped_column(
-        String(64), nullable=False, comment="会话ID", index=True
+        String(64), ForeignKey("conversations.conversation_id"), nullable=False, comment="会话ID", index=True
     )
 
     # 消息内容
