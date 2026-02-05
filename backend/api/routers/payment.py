@@ -9,10 +9,8 @@ from typing import Dict
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.dependencies import get_current_tenant
-from db.session import get_db
+from api.dependencies import TenantDep, DBDep
 from models.payment import PaymentType, SubscriptionType
-from models.tenant import Tenant
 from schemas.payment import (
     CreatePaymentResponse,
     PaymentOrderCreate,
@@ -30,8 +28,8 @@ router = APIRouter(prefix="/payment", tags=["支付管理"])
 @router.post("/orders/create", response_model=CreatePaymentResponse, summary="创建支付订单")
 async def create_payment_order(
     payment_data: PaymentOrderCreate,
-    current_tenant: Tenant = Depends(get_current_tenant),
-    db: AsyncSession = Depends(get_db),
+    tenant_id: TenantDep,
+    db: DBDep,
 ):
     """
     创建支付订单
@@ -56,7 +54,7 @@ async def create_payment_order(
         
         # 创建支付订单
         order, payment_html = await payment_service.create_payment_order(
-            tenant_id=current_tenant.id,
+            tenant_id=tenant_id,
             plan_type=payment_data.plan_type,
             duration_months=payment_data.duration_months,
             payment_type=payment_data.payment_type,
@@ -81,8 +79,8 @@ async def create_payment_order(
 @router.get("/orders/{order_number}", response_model=PaymentOrderDetail, summary="查询订单详情")
 async def get_order_detail(
     order_number: str,
-    current_tenant: Tenant = Depends(get_current_tenant),
-    db: AsyncSession = Depends(get_db),
+    tenant_id: TenantDep,
+    db: DBDep,
 ):
     """
     查询订单详情
@@ -112,8 +110,8 @@ async def get_order_detail(
 @router.post("/orders/{order_number}/sync", summary="同步订单状态")
 async def sync_order_status(
     order_number: str,
-    current_tenant: Tenant = Depends(get_current_tenant),
-    db: AsyncSession = Depends(get_db),
+    tenant_id: TenantDep,
+    db: DBDep,
 ):
     """
     主动同步订单状态
@@ -256,7 +254,7 @@ async def alipay_return_callback(
 @router.post("/callback/alipay/notify", summary="支付宝异步回调（服务器通知）")
 async def alipay_notify_callback(
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: DBDep,
 ):
     """
     支付宝异步回调（服务器到服务器通知）
@@ -305,8 +303,8 @@ async def alipay_notify_callback(
 async def refund_order(
     order_number: str,
     refund_data: RefundRequest,
-    current_tenant: Tenant = Depends(get_current_tenant),
-    db: AsyncSession = Depends(get_db),
+    tenant_id: TenantDep,
+    db: DBDep,
 ):
     """
     申请退款

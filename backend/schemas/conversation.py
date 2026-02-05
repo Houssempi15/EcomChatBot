@@ -1,6 +1,8 @@
 """
 对话相关 Schema
 """
+from __future__ import annotations
+
 from datetime import datetime
 
 from pydantic import Field
@@ -46,6 +48,30 @@ class UserResponse(UserBase, TimestampSchema):
     last_conversation_at: datetime | None
 
 
+# ============ 消息 Schema ============
+class MessageCreate(BaseSchema):
+    """创建消息（发送消息）"""
+
+    content: str = Field(..., min_length=1, max_length=4000, description="消息内容")
+    attachments: list[dict] | None = Field(None, description="附件")
+
+
+class MessageResponse(TimestampSchema):
+    """消息响应"""
+
+    id: int
+    message_id: str
+    conversation_id: str
+    role: str
+    content: str
+    intent: str | None
+    intent_confidence: float | None
+    entities: dict | None
+    response_time: int | None
+    input_tokens: int | None
+    output_tokens: int | None
+
+
 # ============ 会话 Schema ============
 class ConversationCreate(BaseSchema):
     """创建会话"""
@@ -81,32 +107,8 @@ class ConversationResponse(TimestampSchema):
 class ConversationDetailResponse(ConversationResponse):
     """会话详情响应（包含消息列表）"""
 
-    messages: list["MessageResponse"]
+    messages: list[MessageResponse]
     user: UserResponse
-
-
-# ============ 消息 Schema ============
-class MessageCreate(BaseSchema):
-    """创建消息（发送消息）"""
-
-    content: str = Field(..., min_length=1, max_length=4000, description="消息内容")
-    attachments: list[dict] | None = Field(None, description="附件")
-
-
-class MessageResponse(TimestampSchema):
-    """消息响应"""
-
-    id: int
-    message_id: str
-    conversation_id: str
-    role: str
-    content: str
-    intent: str | None
-    intent_confidence: float | None
-    entities: dict | None
-    response_time: int | None
-    input_tokens: int | None
-    output_tokens: int | None
 
 
 # ============ WebSocket 消息格式 ============

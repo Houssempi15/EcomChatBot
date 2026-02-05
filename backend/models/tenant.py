@@ -3,7 +3,7 @@
 """
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, Index, Integer, String, Text
+from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.base import BaseModel
@@ -16,7 +16,7 @@ class Tenant(BaseModel):
     __table_args__ = (
         Index("idx_tenant_id", "tenant_id", unique=True),
         Index("idx_tenant_email", "contact_email"),
-        Index("idx_tenant_status", "status"),
+        Index("idx_tenants_status", "status"),
         Index("idx_tenant_plan", "current_plan"),
         {"comment": "租户表"},
     )
@@ -75,6 +75,15 @@ class Tenant(BaseModel):
     subscriptions: Mapped[list["Subscription"]] = relationship(
         "Subscription", back_populates="tenant", lazy="selectin"
     )
+    payment_orders: Mapped[list["PaymentOrder"]] = relationship(
+        "PaymentOrder", back_populates="tenant", lazy="select"
+    )
+    usage_records: Mapped[list["UsageRecord"]] = relationship(
+        "UsageRecord", back_populates="tenant", lazy="select"
+    )
+    bills: Mapped[list["Bill"]] = relationship(
+        "Bill", back_populates="tenant", lazy="select"
+    )
 
     def __repr__(self) -> str:
         return f"<Tenant {self.company_name} ({self.current_plan})>"
@@ -92,7 +101,7 @@ class Subscription(BaseModel):
 
     # 租户信息
     tenant_id: Mapped[str] = mapped_column(
-        String(64), nullable=False, comment="租户ID", index=True
+        String(64), ForeignKey("tenants.tenant_id"), nullable=False, comment="租户ID", index=True
     )
 
     # 套餐信息
@@ -160,7 +169,7 @@ class UsageRecord(BaseModel):
 
     # 租户信息
     tenant_id: Mapped[str] = mapped_column(
-        String(64), nullable=False, comment="租户ID", index=True
+        String(64), ForeignKey("tenants.tenant_id"), nullable=False, comment="租户ID", index=True
     )
     record_date: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, comment="记录日期", index=True
@@ -179,6 +188,9 @@ class UsageRecord(BaseModel):
     overage_fee: Mapped[float] = mapped_column(
         Float, default=0.0, comment="超额费用"
     )
+
+    # 关联关系
+    tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="usage_records")
 
     def __repr__(self) -> str:
         return f"<UsageRecord {self.tenant_id} - {self.record_date}>"
@@ -200,7 +212,7 @@ class Bill(BaseModel):
         String(64), unique=True, nullable=False, comment="账单ID"
     )
     tenant_id: Mapped[str] = mapped_column(
-        String(64), nullable=False, comment="租户ID", index=True
+        String(64), ForeignKey("tenants.tenant_id"), nullable=False, comment="租户ID", index=True
     )
     billing_period: Mapped[str] = mapped_column(
         String(16), nullable=False, comment="账期(格式: 2024-01)"
@@ -239,6 +251,9 @@ class Bill(BaseModel):
     # 退款信息
     refund_amount: Mapped[float] = mapped_column(Float, default=0.0, comment="退款金额")
     refund_reason: Mapped[str | None] = mapped_column(Text, comment="退款原因")
+
+    # 关联关系
+    tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="bills")
 
     def __repr__(self) -> str:
         return f"<Bill {self.bill_id} - {self.billing_period} - {self.total_amount}>"
