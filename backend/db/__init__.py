@@ -7,6 +7,7 @@ from db.session import (
     Base,
     close_db,
     engine,
+    get_async_session,
     get_db,
     init_db,
 )
@@ -17,6 +18,7 @@ __all__ = [
     "engine",
     "AsyncSessionLocal",
     "get_db",
+    "get_async_session",
     "init_db",
     "close_db",
     # Redis

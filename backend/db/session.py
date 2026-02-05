@@ -66,3 +66,17 @@ async def init_db() -> None:
 async def close_db() -> None:
     """关闭数据库连接"""
     await engine.dispose()
+
+
+def get_async_session():
+    """
+    获取异步会话（用于Celery等非Web场景）
+
+    Returns:
+        AsyncSessionLocal上下文管理器
+
+    用法:
+        async with get_async_session() as db:
+            result = await db.execute(stmt)
+    """
+    return AsyncSessionLocal()
