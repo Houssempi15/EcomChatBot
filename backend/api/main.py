@@ -8,7 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from api.routers import admin, ai_chat, conversation, intent, knowledge, payment, rag, tenant, websocket
+from api.routers import admin, ai_chat, auth, conversation, intent, knowledge, payment, rag, tenant, webhook, websocket
 from core import AppException, settings
 from db import close_db, close_redis, init_db
 
@@ -123,6 +123,7 @@ async def root():
 
 # 注册路由
 app.include_router(admin.router, prefix=settings.api_v1_prefix)
+app.include_router(auth.router, prefix=settings.api_v1_prefix)
 app.include_router(tenant.router, prefix=settings.api_v1_prefix)
 app.include_router(conversation.router, prefix=settings.api_v1_prefix)
 app.include_router(knowledge.router, prefix=settings.api_v1_prefix)
@@ -131,6 +132,7 @@ app.include_router(ai_chat.router, prefix=settings.api_v1_prefix)
 app.include_router(websocket.router, prefix=settings.api_v1_prefix)
 app.include_router(intent.router, prefix=settings.api_v1_prefix)
 app.include_router(rag.router, prefix=settings.api_v1_prefix)
+app.include_router(webhook.router, prefix=settings.api_v1_prefix)
 
 
 if __name__ == "__main__":

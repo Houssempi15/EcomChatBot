@@ -16,6 +16,7 @@ celery_app = Celery(
         "tasks.notification_tasks",
         "tasks.data_tasks",
         "tasks.billing_tasks",
+        "tasks.webhook_tasks",
     ],
 )
 
@@ -51,6 +52,7 @@ celery_app.conf.update(
         "tasks.notification_tasks.*": {"queue": "notifications"},
         "tasks.data_tasks.*": {"queue": "data_processing"},
         "tasks.billing_tasks.*": {"queue": "billing"},
+        "tasks.webhook_tasks.*": {"queue": "webhooks"},
     },
 
     # 默认队列
@@ -70,6 +72,17 @@ celery_app.conf.beat_schedule = {
     "sync-order-status": {
         "task": "tasks.billing_tasks.sync_pending_orders",
         "schedule": 3600.0,  # 每小时执行一次
+    },
+    # 每5分钟重试失败的 Webhook
+    "retry-failed-webhooks": {
+        "task": "tasks.webhook_tasks.retry_failed_webhooks",
+        "schedule": 300.0,  # 每5分钟执行一次
+    },
+    # 每天清理30天前的 Webhook 日志
+    "cleanup-old-webhook-logs": {
+        "task": "tasks.webhook_tasks.cleanup_old_webhook_logs",
+        "schedule": 3600.0 * 24,  # 每24小时执行一次
+        "args": (30,),  # 保留30天
     },
 }
 
