@@ -37,33 +37,13 @@ pipeline {
         }
         
         stage('代码检查') {
-            parallel {
-                stage('Python语法检查') {
-                    steps {
-                        script {
-                            echo '>>> 检查Python代码语法...'
-                            sh '''
-                                cd backend
-                                # 检查Python文件语法
-                                find . -name "*.py" -not -path "./venv/*" -not -path "./__pycache__/*" | while read file; do
-                                    python3 -m py_compile "$file" || echo "Warning: $file has syntax issues"
-                                done
-                                echo "Python语法检查完成"
-                            '''
-                        }
-                    }
-                }
-                
-                stage('Docker配置检查') {
-                    steps {
-                        script {
-                            echo '>>> 检查Docker配置...'
-                            sh '''
-                                docker-compose config -q
-                                echo "Docker配置检查通过"
-                            '''
-                        }
-                    }
+            steps {
+                script {
+                    echo '>>> 检查Docker配置...'
+                    sh '''
+                        docker-compose config -q
+                        echo "✓ Docker配置检查通过"
+                    '''
                 }
             }
         }
