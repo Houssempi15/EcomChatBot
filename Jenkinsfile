@@ -10,8 +10,8 @@ pipeline {
     options {
         // 保留最近10次构建
         buildDiscarder(logRotator(numToKeepStr: '10'))
-        // 设置超时时间
-        timeout(time: 30, unit: 'MINUTES')
+        // 设置超时时间（首次构建需要更长时间）
+        timeout(time: 60, unit: 'MINUTES')
         // 禁止并发构建
         disableConcurrentBuilds()
         // 添加时间戳
@@ -71,10 +71,27 @@ pipeline {
             steps {
                 script {
                     echo '>>> 构建Docker镜像...'
+                    echo '注意: 首次构建可能需要 10-20 分钟下载依赖'
                     sh '''
                         cd ${DEPLOY_PATH}
-                        docker-compose build --parallel
+                        echo "开始构建时间: $(date)"
+                        
+                        # 显示 Docker 版本
+                        docker --version
+                        docker-compose --version
+                        
+                        # 构建镜像（不使用并行，避免输出混乱）
+                        echo "正在构建镜像..."
+                        docker-compose build --no-cache || {
+                            echo "镜像构建失败，查看详细错误"
+                            exit 1
+                        }
+                        
+                        echo "构建完成时间: $(date)"
                         echo "✓ 镜像构建完成"
+                        
+                        # 显示构建的镜像
+                        docker images | grep ecom-chatbot || true
                     '''
                 }
             }
