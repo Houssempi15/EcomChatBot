@@ -24,33 +24,29 @@ pipeline {
                 echo '=========================================='
                 echo '  电商智能客服系统 - CI/CD Pipeline'
                 echo "  构建编号: ${env.BUILD_NUMBER}"
-                echo "  分支: ${env.GIT_BRANCH}"
+                echo "  Git分支: ${env.GIT_BRANCH}"
                 echo "  提交ID: ${env.GIT_COMMIT}"
                 echo '=========================================='
             }
         }
         
-        stage('代码拉取') {
-            steps {
-                echo '>>> 代码已通过SCM拉取到Jenkins工作空间'
-                sh 'ls -la'
-            }
-        }
-        
-        stage('部署到服务器') {
+        stage('拉取最新代码') {
             steps {
                 script {
-                    echo '>>> 同步代码到部署目录...'
+                    echo '>>> 在部署目录拉取最新代码...'
                     sh '''
-                        # 同步代码到部署目录（排除.git目录）
-                        rsync -av --delete \
-                            --exclude='.git' \
-                            --exclude='venv' \
-                            --exclude='__pycache__' \
-                            --exclude='*.pyc' \
-                            ${WORKSPACE}/ ${DEPLOY_PATH}/
+                        cd ${DEPLOY_PATH}
                         
-                        echo "✓ 代码同步完成"
+                        # 拉取最新代码
+                        git fetch origin develop
+                        git checkout develop
+                        git pull origin develop
+                        
+                        # 显示最新提交
+                        echo "最新提交:"
+                        git log -1 --oneline
+                        
+                        echo "✓ 代码更新完成"
                     '''
                 }
             }
@@ -76,6 +72,7 @@ pipeline {
                     sh '''
                         cd ${DEPLOY_PATH}
                         docker-compose build --parallel
+                        echo "✓ 镜像构建完成"
                     '''
                 }
             }
@@ -89,6 +86,7 @@ pipeline {
                         cd ${DEPLOY_PATH}
                         # 停止应用服务（保留数据库等基础服务）
                         docker-compose stop api celery-worker || true
+                        echo "✓ 旧服务已停止"
                     '''
                 }
             }
@@ -116,6 +114,8 @@ pipeline {
                         
                         # 清理未使用的镜像
                         docker image prune -f || true
+                        
+                        echo "✓ 新服务已启动"
                     '''
                 }
             }
@@ -133,16 +133,20 @@ pipeline {
                         sleep 30
                         
                         # 检查服务状态
+                        echo "=== 服务状态 ==="
                         docker-compose ps
                         
                         # 检查API健康
-                        echo "检查API健康状态..."
+                        echo ""
+                        echo "=== API健康检查 ==="
                         max_attempts=10
                         attempt=0
                         
                         while [ $attempt -lt $max_attempts ]; do
                             if curl -f -s http://localhost:8000/docs > /dev/null 2>&1; then
                                 echo "✓ API服务健康检查通过"
+                                echo "  API地址: http://localhost:8000"
+                                echo "  API文档: http://localhost:8000/docs"
                                 exit 0
                             fi
                             echo "等待API服务启动... ($attempt/$max_attempts)"
@@ -151,20 +155,21 @@ pipeline {
                         done
                         
                         echo "⚠ API服务启动超时，但部署已完成"
+                        echo "  请手动检查服务状态"
                         exit 0
                     '''
                 }
             }
         }
         
-        stage('部署后检查') {
+        stage('部署验证') {
             steps {
                 script {
                     echo '>>> 部署后验证...'
                     sh '''
                         cd ${DEPLOY_PATH}
                         
-                        echo "=== 服务状态 ==="
+                        echo "=== 最终服务状态 ==="
                         docker-compose ps
                         
                         echo ""
@@ -173,7 +178,7 @@ pipeline {
                         
                         echo ""
                         echo "=== 部署完成时间 ==="
-                        date
+                        date '+%Y-%m-%d %H:%M:%S'
                     '''
                 }
             }
@@ -183,24 +188,39 @@ pipeline {
     post {
         success {
             echo '=========================================='
-            echo '  ✓ 部署成功！'
+            echo '  🎉 部署成功！'
             echo "  构建编号: ${env.BUILD_NUMBER}"
-            echo "  分支: ${env.GIT_BRANCH}"
-            echo "  API地址: http://localhost:8000"
-            echo "  API文档: http://localhost:8000/docs"
+            echo "  Git分支: ${env.GIT_BRANCH}"
+            echo "  提交ID: ${env.GIT_COMMIT}"
+            echo '  '
+            echo '  访问地址:'
+            echo '  API服务: http://localhost:8000'
+            echo '  API文档: http://localhost:8000/docs'
             echo '=========================================='
         }
         
         failure {
             echo '=========================================='
-            echo '  ✗ 部署失败！'
+            echo '  ❌ 部署失败！'
             echo "  构建编号: ${env.BUILD_NUMBER}"
             echo '  请检查日志以获取详细信息'
             echo '=========================================='
+            
+            script {
+                sh '''
+                    cd ${DEPLOY_PATH}
+                    echo "=== 错误诊断信息 ==="
+                    echo "服务状态:"
+                    docker-compose ps || true
+                    echo ""
+                    echo "最近日志:"
+                    docker-compose logs --tail=30 || true
+                '''
+            }
         }
         
         always {
-            echo '构建流程结束'
+            echo '>>> 构建流程结束'
         }
     }
 }
