@@ -5,6 +5,7 @@ from typing import List
 import re
 
 
+
 class ContentFilter:
     """内容安全过滤器"""
 
