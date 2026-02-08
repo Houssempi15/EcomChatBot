@@ -36,13 +36,21 @@ pipeline {
                     echo '>>> 同步代码到部署目录...'
                     sh '''
                         # Jenkins已经把代码拉取到 ${WORKSPACE}
-                        # 我们只需要复制到部署目录
+                        # 使用rsync同步代码，排除.git目录避免权限问题
                         
                         echo "源目录: ${WORKSPACE}"
                         echo "目标目录: ${DEPLOY_PATH}"
                         
-                        # 复制所有文件（排除.git目录）
-                        cp -rf ${WORKSPACE}/. ${DEPLOY_PATH}/
+                        # 确保目标目录存在
+                        mkdir -p ${DEPLOY_PATH}
+                        
+                        # 使用rsync同步（排除.git目录）
+                        rsync -av --delete \
+                            --exclude='.git' \
+                            --exclude='*.pyc' \
+                            --exclude='__pycache__' \
+                            --exclude='.env' \
+                            ${WORKSPACE}/ ${DEPLOY_PATH}/
                         
                         # 显示同步后的文件
                         echo ""
