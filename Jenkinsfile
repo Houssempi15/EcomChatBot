@@ -319,12 +319,12 @@ echo "[INFO] 测试执行完成，退出码: ${TEST_EXIT_CODE:-0}"
 echo ""
 echo "[INFO] 生成测试摘要..."
 
-# 解析测试结果
+# 解析测试结果 - 使用sed避免Groovy转义问题
 if [ -f "/app/test-reports/junit-report.xml" ]; then
-    TOTAL_TESTS=$(grep -oP 'tests="\K[0-9]+' /app/test-reports/junit-report.xml | head -1 || echo "0")
-    FAILURES=$(grep -oP 'failures="\K[0-9]+' /app/test-reports/junit-report.xml | head -1 || echo "0")
-    ERRORS=$(grep -oP 'errors="\K[0-9]+' /app/test-reports/junit-report.xml | head -1 || echo "0")
-    SKIPPED=$(grep -oP 'skipped="\K[0-9]+' /app/test-reports/junit-report.xml | head -1 || echo "0")
+    TOTAL_TESTS=$(grep 'tests=' /app/test-reports/junit-report.xml | head -1 | sed 's/.*tests="\\([0-9]*\\)".*/\\1/' || echo "0")
+    FAILURES=$(grep 'failures=' /app/test-reports/junit-report.xml | head -1 | sed 's/.*failures="\\([0-9]*\\)".*/\\1/' || echo "0")
+    ERRORS=$(grep 'errors=' /app/test-reports/junit-report.xml | head -1 | sed 's/.*errors="\\([0-9]*\\)".*/\\1/' || echo "0")
+    SKIPPED=$(grep 'skipped=' /app/test-reports/junit-report.xml | head -1 | sed 's/.*skipped="\\([0-9]*\\)".*/\\1/' || echo "0")
     PASSED=$((TOTAL_TESTS - FAILURES - ERRORS - SKIPPED))
 else
     TOTAL_TESTS="0"
@@ -336,8 +336,8 @@ fi
 
 # 获取覆盖率
 if [ -f "/app/test-reports/coverage.xml" ]; then
-    COVERAGE=$(grep -oP 'line-rate="\K[0-9.]+' /app/test-reports/coverage.xml | head -1 || echo "0")
-    COVERAGE_PERCENT=$(echo "scale=2; $COVERAGE * 100" | bc)
+    COVERAGE=$(grep 'line-rate=' /app/test-reports/coverage.xml | head -1 | sed 's/.*line-rate="\\([0-9.]*\\)".*/\\1/' || echo "0")
+    COVERAGE_PERCENT=$(echo "$COVERAGE * 100" | bc 2>/dev/null || echo "0")
 else
     COVERAGE_PERCENT="0"
 fi
