@@ -13,6 +13,7 @@ import pytest
 import pytest_asyncio
 from faker import Faker
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import String
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -25,6 +26,46 @@ from models import Admin, Subscription, Tenant
 
 # 使用内存数据库进行测试
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+
+# ==================== SQLite UUID 兼容性修复 ====================
+# 问题：SQLAlchemy 在 SQLite 上编译 PostgreSQL UUID 类型时失败
+# 解决方案：为 SQLite 方言注册 UUID 类型编译器
+
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+
+
+# 为 SQLite 注册 PostgreSQL UUID 类型的编译器
+# 当 SQLite 遇到 PG_UUID 类型时，将其编译为 VARCHAR(36)
+@compiles(PG_UUID, 'sqlite')
+def compile_uuid_sqlite(element, compiler, **kw):
+    """在 SQLite 上将 UUID 编译为 VARCHAR(36)"""
+    return "VARCHAR(36)"
+
+
+# 同时修补 GUID 类型以确保在 SQLite 上工作
+def _patch_guid_for_sqlite():
+    """修补 GUID 类型以支持 SQLite"""
+    try:
+        from models.audit_log import GUID
+
+        # 保存原始方法
+        if not hasattr(GUID, '_original_load_dialect_impl'):
+            GUID._original_load_dialect_impl = GUID.load_dialect_impl
+
+            def patched_load_dialect_impl(self, dialect):
+                if dialect.name == 'sqlite':
+                    return dialect.type_descriptor(String(36))
+                return GUID._original_load_dialect_impl(self, dialect)
+
+            GUID.load_dialect_impl = patched_load_dialect_impl
+    except ImportError:
+        pass
+
+
+_patch_guid_for_sqlite()
+
 
 # 创建测试引擎
 test_engine = create_async_engine(
