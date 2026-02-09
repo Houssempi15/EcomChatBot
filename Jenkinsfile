@@ -248,39 +248,171 @@ pipeline {
                     echo '  🧪 执行CI/CD自动化测试'
                     echo '=========================================='
                     sh '''
-                        cd ${DEPLOY_PATH}/backend
+                        cd ${DEPLOY_PATH}
                         
-                        echo ">>> 当前工作目录: $(pwd)"
-                        echo ">>> Python版本: $(python3 --version)"
-                        echo ">>> 检查测试脚本..."
-                        ls -la tests/run_ci_tests.sh
+                        echo ">>> 在Docker容器中运行测试..."
+                        echo ">>> API容器: ecom-chatbot-api"
+                        echo ""
+                        
+                        # 在API容器中执行测试
+                        docker-compose exec -T api bash << 'DOCKER_EOF'
+set -e
+
+echo "╔════════════════════════════════════════════════════════╗"
+echo "║   电商智能客服SaaS平台 - CI/CD自动化测试               ║"
+echo "╚════════════════════════════════════════════════════════╝"
+echo ""
+
+# 显示环境信息
+echo "[INFO] 容器环境信息:"
+echo "  - Python版本: $(python --version)"
+echo "  - 工作目录: $(pwd)"
+echo ""
+
+# 检查pytest是否已安装
+echo "[INFO] 检查测试依赖..."
+if ! python -c "import pytest" 2>/dev/null; then
+    echo "[WARNING] pytest未安装，正在安装测试依赖..."
+    pip install pytest pytest-asyncio pytest-cov pytest-html httpx faker -q
+    echo "[SUCCESS] 测试依赖安装完成"
+else
+    echo "[SUCCESS] pytest已安装"
+fi
+
+# 创建测试报告目录
+echo ""
+echo "[INFO] 准备测试报告目录..."
+mkdir -p /app/test-reports/coverage-html
+mkdir -p /app/test-reports/logs
+rm -f /app/test-reports/*.xml /app/test-reports/*.html
+
+# 运行测试
+echo ""
+echo "=========================================="
+echo "  开始运行测试套件"
+echo "=========================================="
+echo ""
+
+cd /app
+
+# 执行测试并生成报告
+pytest tests/ \
+    -v \
+    --tb=short \
+    --maxfail=50 \
+    --junit-xml=/app/test-reports/junit-report.xml \
+    --html=/app/test-reports/test-report.html \
+    --self-contained-html \
+    --cov=api \
+    --cov=services \
+    --cov=models \
+    --cov-report=html:/app/test-reports/coverage-html \
+    --cov-report=xml:/app/test-reports/coverage.xml \
+    --cov-report=term-missing:skip-covered \
+    -m "not slow" \
+    2>&1 | tee /app/test-reports/logs/test-output.log || TEST_EXIT_CODE=$?
+
+echo ""
+echo "[INFO] 测试执行完成，退出码: ${TEST_EXIT_CODE:-0}"
+
+# 生成测试摘要
+echo ""
+echo "[INFO] 生成测试摘要..."
+
+# 解析测试结果
+if [ -f "/app/test-reports/junit-report.xml" ]; then
+    TOTAL_TESTS=$(grep -oP 'tests="\K[0-9]+' /app/test-reports/junit-report.xml | head -1 || echo "0")
+    FAILURES=$(grep -oP 'failures="\K[0-9]+' /app/test-reports/junit-report.xml | head -1 || echo "0")
+    ERRORS=$(grep -oP 'errors="\K[0-9]+' /app/test-reports/junit-report.xml | head -1 || echo "0")
+    SKIPPED=$(grep -oP 'skipped="\K[0-9]+' /app/test-reports/junit-report.xml | head -1 || echo "0")
+    PASSED=$((TOTAL_TESTS - FAILURES - ERRORS - SKIPPED))
+else
+    TOTAL_TESTS="0"
+    PASSED="0"
+    FAILURES="0"
+    ERRORS="0"
+    SKIPPED="0"
+fi
+
+# 获取覆盖率
+if [ -f "/app/test-reports/coverage.xml" ]; then
+    COVERAGE=$(grep -oP 'line-rate="\K[0-9.]+' /app/test-reports/coverage.xml | head -1 || echo "0")
+    COVERAGE_PERCENT=$(echo "scale=2; $COVERAGE * 100" | bc)
+else
+    COVERAGE_PERCENT="0"
+fi
+
+# 生成摘要文件
+cat > /app/test-reports/test-summary.txt << EOF
+========================================
+  电商智能客服SaaS平台 - 测试报告
+========================================
+
+构建信息:
+  构建编号: ${BUILD_NUMBER:-Manual}
+  Git分支: ${GIT_BRANCH:-Unknown}
+  提交ID: ${GIT_COMMIT:-Unknown}
+  构建时间: $(date '+%Y-%m-%d %H:%M:%S')
+
+测试环境:
+  容器: ecom-chatbot-api
+  Python版本: $(python --version)
+
+测试结果:
+  总测试数: ${TOTAL_TESTS}
+  通过: ${PASSED}
+  失败: ${FAILURES}
+  错误: ${ERRORS}
+  跳过: ${SKIPPED}
+  代码覆盖率: ${COVERAGE_PERCENT}%
+
+测试状态: $([ "${TEST_EXIT_CODE:-0}" = "0" ] && echo "✓ 通过" || echo "✗ 失败")
+
+测试报告文件:
+  - JUnit报告: test-reports/junit-report.xml
+  - HTML报告: test-reports/test-report.html
+  - 覆盖率HTML: test-reports/coverage-html/index.html
+  - 覆盖率XML: test-reports/coverage.xml
+  - 测试日志: test-reports/logs/test-output.log
+
+========================================
+EOF
+
+cat /app/test-reports/test-summary.txt
+
+echo ""
+echo "[SUCCESS] 测试完成！"
+echo ""
+
+# 列出生成的文件
+echo "[INFO] 生成的测试报告文件:"
+ls -lh /app/test-reports/ 2>/dev/null | tail -n +2 || true
+echo ""
+ls -lh /app/test-reports/coverage-html/ 2>/dev/null | head -5 || true
+
+# 退出
+exit ${TEST_EXIT_CODE:-0}
+
+DOCKER_EOF
+
+                        echo ""
+                        echo ">>> 从容器复制测试报告到宿主机..."
+                        
+                        # 确保宿主机目录存在
+                        mkdir -p ${DEPLOY_PATH}/backend/test-reports
+                        
+                        # 从容器复制报告文件
+                        docker cp ecom-chatbot-api:/app/test-reports/. ${DEPLOY_PATH}/backend/test-reports/
+                        
+                        echo "✓ 测试报告已复制到: ${DEPLOY_PATH}/backend/test-reports/"
+                        echo ""
+                        
+                        # 显示报告文件
+                        echo ">>> 生成的测试报告:"
+                        ls -lh ${DEPLOY_PATH}/backend/test-reports/ | grep -E "\\.(xml|html|txt)$" || true
                         
                         echo ""
-                        echo ">>> 开始执行测试..."
-                        
-                        # 使用专门的CI测试脚本
-                        chmod +x tests/run_ci_tests.sh
-                        
-                        # 执行测试，捕获退出码但不中断流水线
-                        set +e
-                        ./tests/run_ci_tests.sh
-                        TEST_EXIT_CODE=$?
-                        set -e
-                        
-                        echo ""
-                        echo ">>> 测试执行完成，退出码: $TEST_EXIT_CODE"
-                        
-                        # 检查报告是否生成
-                        echo ">>> 检查测试报告..."
-                        if [ -d "test-reports" ]; then
-                            echo "✓ test-reports 目录存在"
-                            ls -la test-reports/
-                        else
-                            echo "✗ test-reports 目录不存在"
-                        fi
-                        
-                        echo ""
-                        echo "✓ 测试阶段完成"
+                        echo "✓ 测试执行完成"
                     '''
                 }
             }
