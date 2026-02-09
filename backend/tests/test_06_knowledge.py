@@ -273,6 +273,7 @@ class TestKnowledgeSearch:
 class TestRAGQuery:
     """RAG查询测试"""
 
+    @pytest.mark.skip(reason="需要 Milvus 向量数据库")
     async def test_rag_query_basic(
         self, client: AsyncClient, tenant_api_key_headers: dict
     ):
@@ -291,6 +292,7 @@ class TestRAGQuery:
         assert "results" in result
         assert "query_time" in result
 
+    @pytest.mark.skip(reason="需要 Milvus 向量数据库")
     async def test_rag_query_with_different_top_k(
         self, client: AsyncClient, tenant_api_key_headers: dict
     ):

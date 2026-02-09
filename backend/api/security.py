@@ -12,7 +12,11 @@ class RateLimiter:
     """速率限制器（基于Redis）"""
 
     def __init__(self):
-        self.redis = Redis.from_url(settings.redis_url, decode_responses=True)
+        try:
+            self.redis = Redis.from_url(str(settings.redis_url), decode_responses=True)
+        except Exception:
+            # 在测试环境下 Redis 可能不可用，使用 None 标记
+            self.redis = None
 
     def _get_key(self, identifier: str, limit_type: str) -> str:
         """生成Redis键"""
@@ -40,6 +44,9 @@ class RateLimiter:
         key = self._get_key(identifier, limit_type)
 
         try:
+            if self.redis is None:
+                return True
+
             # 获取当前计数
             current = self.redis.get(key)
 
@@ -69,9 +76,14 @@ class RateLimiter:
         limit_type: str
     ) -> int:
         """获取剩余配额"""
-        key = self._get_key(identifier, limit_type)
-        current = self.redis.get(key)
-        return int(current) if current else 0
+        try:
+            if self.redis is None:
+                return 0
+            key = self._get_key(identifier, limit_type)
+            current = self.redis.get(key)
+            return int(current) if current else 0
+        except Exception:
+            return 0
 
 
 # 全局限流器实例

@@ -129,7 +129,9 @@ class QuotaUsageResponse(BaseSchema):
 
     conversation: dict[str, int | float]
     storage: dict[str, float]
-    api: dict[str, int | float]
+    api_call: dict[str, int | float]
+    concurrent: dict[str, int | float]
+    knowledge: dict[str, int | float]
 
 
 # ============ 账单 Schema ============
@@ -182,7 +184,7 @@ class TenantLoginResponse(BaseSchema):
     """租户登录响应"""
 
     access_token: str
-    refresh_token: str
+    refresh_token: str | None = None
     token_type: str = "bearer"
     expires_in: int
     tenant_id: str

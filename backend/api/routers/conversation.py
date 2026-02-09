@@ -43,34 +43,6 @@ async def create_conversation(
     return ApiResponse(data=conversation)
 
 
-@router.get(
-    "/{conversation_id}",
-    response_model=ApiResponse[ConversationDetailResponse],
-)
-async def get_conversation(
-    conversation_id: str,
-    tenant_id: TenantDep,
-    db: DBDep,
-):
-    """获取会话详情"""
-    service = ConversationService(db, tenant_id)
-    conversation = await service.get_conversation(conversation_id)
-
-    # 获取消息列表
-    messages = await service.get_messages(conversation_id)
-
-    # 获取用户信息
-    user = await service.get_or_create_user(conversation.user.user_external_id)
-
-    response = ConversationDetailResponse(
-        **conversation.__dict__,
-        messages=messages,
-        user=user,
-    )
-
-    return ApiResponse(data=response)
-
-
 @router.get("/list", response_model=ApiResponse[PaginatedResponse[ConversationResponse]])
 async def list_conversations(
     tenant_id: TenantDep,
@@ -97,6 +69,39 @@ async def list_conversations(
     )
 
     return ApiResponse(data=paginated)
+
+
+@router.get(
+    "/{conversation_id}",
+    response_model=ApiResponse[ConversationDetailResponse],
+)
+async def get_conversation(
+    conversation_id: str,
+    tenant_id: TenantDep,
+    db: DBDep,
+):
+    """获取会话详情"""
+    service = ConversationService(db, tenant_id)
+    conversation = await service.get_conversation(conversation_id)
+
+    # 获取消息列表
+    messages = await service.get_messages(conversation_id)
+
+    # 获取用户信息
+    user = await service.get_or_create_user(conversation.user.user_external_id)
+
+    # 构建响应，避免字段重复
+    conv_dict = {k: v for k, v in conversation.__dict__.items() if not k.startswith('_')}
+    conv_dict.pop('messages', None)  # 移除可能存在的 messages 字段
+    conv_dict.pop('user', None)  # 移除可能存在的 user 字段
+    
+    response = ConversationDetailResponse(
+        **conv_dict,
+        messages=messages,
+        user=user,
+    )
+
+    return ApiResponse(data=response)
 
 
 @router.post(

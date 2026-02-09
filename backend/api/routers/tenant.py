@@ -73,7 +73,10 @@ async def login_tenant(
     返回JWT Token和租户ID，Token有效期为24小时。
     """
     service = TenantService(db)
-    tenant_id = await service.authenticate_tenant(login_data.email, login_data.password)
+    result = await service.authenticate_tenant(login_data.email, login_data.password)
+
+    # authenticate_tenant 可能返回 Tenant 对象或 tenant_id 字符串
+    tenant_id = result.tenant_id if hasattr(result, "tenant_id") else result
 
     # 创建JWT Token
     access_token = create_access_token(

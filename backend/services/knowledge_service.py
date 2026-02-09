@@ -29,7 +29,10 @@ class KnowledgeService:
         priority: int = 0,
     ) -> KnowledgeBase:
         """创建知识条目"""
-        knowledge_id = f"kb_{self.tenant_id}_{int(datetime.utcnow().timestamp())}"
+        import uuid
+        timestamp = int(datetime.utcnow().timestamp())
+        random_suffix = uuid.uuid4().hex[:8]
+        knowledge_id = f"kb_{self.tenant_id}_{timestamp}_{random_suffix}"
 
         knowledge = KnowledgeBase(
             tenant_id=self.tenant_id,

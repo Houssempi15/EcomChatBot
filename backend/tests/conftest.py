@@ -2,11 +2,12 @@
 测试配置和 Fixtures
 """
 import asyncio
+import json
 import uuid
 from collections.abc import AsyncGenerator, Generator
 from datetime import datetime, timedelta
 from typing import Any, Dict
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
@@ -46,6 +47,67 @@ TestSessionLocal = sessionmaker(
 fake = Faker(["zh_CN"])
 
 
+def _create_redis_mock() -> AsyncMock:
+    """创建一个完整的 Redis mock 对象"""
+    mock = AsyncMock()
+    mock.get = AsyncMock(return_value=None)
+    mock.set = AsyncMock(return_value=True)
+    mock.setex = AsyncMock(return_value=True)
+    mock.delete = AsyncMock(return_value=True)
+    mock.exists = AsyncMock(return_value=False)
+    mock.incr = AsyncMock(return_value=1)
+    mock.incrby = AsyncMock(return_value=1)
+    mock.decr = AsyncMock(return_value=0)
+    mock.decrby = AsyncMock(return_value=0)
+    mock.expire = AsyncMock(return_value=True)
+    mock.ttl = AsyncMock(return_value=-1)
+    mock.ping = AsyncMock(return_value=True)
+    mock.close = AsyncMock(return_value=None)
+    mock.hget = AsyncMock(return_value=None)
+    mock.hset = AsyncMock(return_value=True)
+    mock.hgetall = AsyncMock(return_value={})
+    mock.lpush = AsyncMock(return_value=1)
+    mock.rpush = AsyncMock(return_value=1)
+    mock.lrange = AsyncMock(return_value=[])
+    mock.llen = AsyncMock(return_value=0)
+    mock.zadd = AsyncMock(return_value=1)
+    mock.zrem = AsyncMock(return_value=1)
+    mock.zcard = AsyncMock(return_value=0)
+    mock.zrange = AsyncMock(return_value=[])
+    mock.zremrangebyscore = AsyncMock(return_value=0)
+    mock.pipeline = MagicMock()
+    pipe_mock = AsyncMock()
+    pipe_mock.execute = AsyncMock(return_value=[0, 0, 1, True])
+    pipe_mock.set = MagicMock(return_value=pipe_mock)
+    pipe_mock.zadd = MagicMock(return_value=pipe_mock)
+    pipe_mock.zremrangebyscore = MagicMock(return_value=pipe_mock)
+    pipe_mock.zcard = MagicMock(return_value=pipe_mock)
+    pipe_mock.expire = MagicMock(return_value=pipe_mock)
+    mock.pipeline.return_value = pipe_mock
+    mock.info = AsyncMock(return_value={
+        "connected_clients": 1,
+        "used_memory_human": "1M",
+        "uptime_in_days": 1,
+        "total_commands_processed": 100,
+    })
+    return mock
+
+
+def _create_sync_redis_mock() -> MagicMock:
+    """创建一个同步 Redis mock（用于 api/security.py 的 RateLimiter）"""
+    mock = MagicMock()
+    mock.get = MagicMock(return_value=None)
+    mock.set = MagicMock(return_value=True)
+    mock.incr = MagicMock(return_value=1)
+    mock.expire = MagicMock(return_value=True)
+    mock.pipeline = MagicMock()
+    pipe_mock = MagicMock()
+    pipe_mock.set = MagicMock(return_value=pipe_mock)
+    pipe_mock.execute = MagicMock(return_value=[True])
+    mock.pipeline.return_value = pipe_mock
+    return mock
+
+
 # ==================== 基础 Fixtures ====================
 
 
@@ -75,27 +137,13 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 @pytest_asyncio.fixture(scope="function")
 async def redis_mock():
     """Mock Redis客户端"""
-    redis = AsyncMock()
-    redis.get = AsyncMock(return_value=None)
-    redis.set = AsyncMock(return_value=True)
-    redis.delete = AsyncMock(return_value=True)
-    redis.exists = AsyncMock(return_value=False)
-    redis.incr = AsyncMock(return_value=1)
-    redis.expire = AsyncMock(return_value=True)
-    redis.ttl = AsyncMock(return_value=-1)
-    redis.ping = AsyncMock(return_value=True)
-    redis.info = AsyncMock(return_value={
-        "connected_clients": 1,
-        "used_memory_human": "1M",
-        "uptime_in_days": 1,
-        "total_commands_processed": 100,
-    })
-    return redis
+    return _create_redis_mock()
 
 
 @pytest_asyncio.fixture(scope="function")
 async def client(db_session: AsyncSession, redis_mock) -> AsyncGenerator[AsyncClient, None]:
     """创建测试客户端"""
+    import db.redis as redis_module
 
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
@@ -103,15 +151,25 @@ async def client(db_session: AsyncSession, redis_mock) -> AsyncGenerator[AsyncCl
     async def override_get_redis():
         return redis_mock
 
+    # 1. FastAPI 依赖注入覆盖
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_redis] = override_get_redis
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test",
-    ) as ac:
-        yield ac
+    # 2. 模块级别 Redis 全局变量覆盖（覆盖直接调用 get_redis() 的代码）
+    original_redis_client = redis_module.redis_client
+    redis_module.redis_client = redis_mock
 
+    # 3. 覆盖 api/security.py 中的同步 RateLimiter
+    sync_redis_mock = _create_sync_redis_mock()
+    with patch("api.security.rate_limiter.redis", sync_redis_mock):
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as ac:
+            yield ac
+
+    # 清理
+    redis_module.redis_client = original_redis_client
     app.dependency_overrides.clear()
 
 
@@ -135,12 +193,9 @@ def test_webhook_data() -> dict[str, Any]:
     """测试 Webhook 数据"""
     return {
         "name": "测试 Webhook",
-        "description": "测试描述",
-        "url": "https://example.com/webhook",
-        "event_type": "conversation.created",
-        "timeout": 30,
-        "retry_count": 3,
-        "retry_interval": 60,
+        "endpoint_url": "https://example.com/webhook",
+        "events": ["conversation.started"],  # 使用实际存在的事件类型
+        "secret": None,  # 可选，不提供则自动生成
     }
 
 
@@ -210,8 +265,8 @@ def webhook_data() -> Dict[str, Any]:
     return {
         "name": "测试Webhook",
         "endpoint_url": "https://example.com/webhook",
-        "events": ["conversation.created", "conversation.closed"],
-        "secret": "test_secret_key",
+        "events": ["conversation.started", "conversation.ended"],
+        "secret": None,  # 可选，让服务自动生成
     }
 
 
@@ -342,6 +397,77 @@ def tenant_api_key_headers(test_tenant: Tenant) -> Dict[str, str]:
         "X-API-Key": test_tenant.plain_api_key,
         "Content-Type": "application/json",
     }
+
+
+# ==================== 扩展实体 Fixtures ====================
+
+
+@pytest_asyncio.fixture
+async def test_tenant_with_basic_plan(
+    db_session: AsyncSession, tenant_data: Dict
+) -> Tenant:
+    """创建带基础套餐的测试租户"""
+    tenant_id = f"TENANT_{uuid.uuid4().hex[:12].upper()}"
+    api_key = f"sk_live_{uuid.uuid4().hex}"
+
+    tenant = Tenant(
+        tenant_id=tenant_id,
+        company_name=tenant_data["company_name"],
+        contact_name=tenant_data["contact_name"],
+        contact_email=tenant_data["contact_email"],
+        contact_phone=tenant_data.get("contact_phone"),
+        password_hash=hash_password(tenant_data["password"]),
+        api_key_hash=hash_password(api_key),
+        status="active",
+    )
+    db_session.add(tenant)
+
+    # 创建基础套餐订阅
+    subscription = Subscription(
+        tenant_id=tenant_id,
+        plan_type="basic",
+        status="active",
+        start_date=datetime.utcnow(),
+        expire_at=datetime.utcnow() + timedelta(days=30),
+        enabled_features='["BASIC_CHAT", "KNOWLEDGE_BASE"]',
+        conversation_quota=5000,
+        concurrent_quota=20,
+        storage_quota=5,
+        api_quota=50000,
+    )
+    db_session.add(subscription)
+
+    await db_session.commit()
+    await db_session.refresh(tenant)
+
+    tenant.plain_api_key = api_key
+
+    return tenant
+
+
+# ==================== 批量数据生成 Fixtures ====================
+
+
+@pytest.fixture
+def generate_multiple_knowledge():
+    """生成多个知识库条目"""
+
+    def _generate(count: int = 10):
+        categories = ["常见问题", "产品说明", "使用指南", "售后服务", "政策条款"]
+        return [
+            {
+                "knowledge_type": "faq",
+                "title": fake.sentence(),
+                "content": fake.text(),
+                "category": fake.random_element(categories),
+                "tags": [fake.word() for _ in range(3)],
+                "source": "manual",
+                "priority": fake.random_int(1, 5),
+            }
+            for _ in range(count)
+        ]
+
+    return _generate
 
 
 # ==================== Mock服务 Fixtures ====================

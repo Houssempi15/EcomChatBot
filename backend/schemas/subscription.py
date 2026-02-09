@@ -1,11 +1,12 @@
 """
 订阅相关 Pydantic schemas
 """
+import json
 from datetime import datetime
 from typing import Optional, List
 from decimal import Decimal
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 
 # ========== 订阅请求 Schemas ==========
@@ -47,6 +48,14 @@ class SubscriptionDetail(BaseModel):
 
     # 功能信息
     enabled_features: List[str]
+
+    @field_validator('enabled_features', mode='before')
+    @classmethod
+    def parse_enabled_features(cls, v):
+        """将JSON字符串转换为list"""
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
 
     # 待变更套餐（如果有）
     pending_plan: Optional[str] = None

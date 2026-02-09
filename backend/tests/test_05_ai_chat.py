@@ -13,6 +13,7 @@ pytestmark = [pytest.mark.asyncio, pytest.mark.ai_chat]
 class TestAIChatBasic:
     """AI对话基础测试"""
 
+    @pytest.mark.skip(reason="需要真实的 LLM 服务")
     async def test_ai_chat_success(
         self, client: AsyncClient, tenant_api_key_headers: dict, conversation_data: dict
     ):
@@ -50,6 +51,7 @@ class TestAIChatBasic:
         assert "model" in result
         assert result["used_rag"] is False
 
+    @pytest.mark.skip(reason="需要真实的 LLM 服务")
     async def test_ai_chat_with_rag(
         self, client: AsyncClient, tenant_api_key_headers: dict, conversation_data: dict
     ):
@@ -130,6 +132,7 @@ class TestAIChatStreaming:
 class TestIntentClassification:
     """意图分类测试"""
 
+    @pytest.mark.skip(reason="需要真实的 LLM 服务")
     async def test_classify_intent_success(
         self, client: AsyncClient, tenant_api_key_headers: dict
     ):
@@ -173,6 +176,7 @@ class TestIntentClassification:
 class TestEntityExtraction:
     """实体提取测试"""
 
+    @pytest.mark.skip(reason="需要真实的 LLM 服务")
     async def test_extract_entities_success(
         self, client: AsyncClient, tenant_api_key_headers: dict
     ):

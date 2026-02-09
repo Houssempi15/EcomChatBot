@@ -117,7 +117,7 @@ class TestDataGenerator:
         """生成知识库数据"""
         categories = ["常见问题", "产品说明", "使用指南", "售后服务", "政策条款"]
         return {
-            "knowledge_type": random.choice(["faq", "product", "guide"]),
+            "knowledge_type": random.choice(["faq", "product", "doc", "policy"]),
             "title": fake.sentence(),
             "content": fake.text(),
             "category": category or random.choice(categories),

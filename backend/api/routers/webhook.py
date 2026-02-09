@@ -19,6 +19,23 @@ from services.webhook_service import WebhookService
 router = APIRouter(prefix="/webhooks", tags=["Webhook"])
 
 
+@router.get("/event-types")
+async def get_event_types():
+    """获取所有可用的 Webhook 事件类型（公开端点，无需认证）"""
+    from models.webhook import WebhookEventType
+    
+    event_types = [
+        {
+            "value": event.value,
+            "name": event.name,
+            "description": event.value.replace(".", " ").replace("_", " ").title()
+        }
+        for event in WebhookEventType
+    ]
+    
+    return ApiResponse(data={"event_types": event_types})
+
+
 @router.post("", response_model=ApiResponse[WebhookResponse])
 async def create_webhook(
     webhook_data: WebhookCreateRequest,
