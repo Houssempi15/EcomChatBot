@@ -63,9 +63,10 @@ class TestDataGenerator:
 
     @staticmethod
     def generate_admin(
-        role: str = "super_admin", status: str = "active"
+        role: str = "support_admin", status: str = "active"
     ) -> Dict[str, Any]:
         """生成管理员数据"""
+        # 角色只能是: super_admin, finance_admin, support_admin, viewer
         return {
             "username": f"admin_{uuid.uuid4().hex[:8]}",
             "password": "Admin@123456",
@@ -195,7 +196,13 @@ class AssertHelper:
         assert response.status_code == expected_status, f"期望状态码 {expected_status}, 实际 {response.status_code}"
 
         data = response.json()
-        assert data.get("success") is False or "error" in data, "响应应该包含错误信息"
+        # 支持多种错误响应格式
+        has_error = (
+            data.get("success") is False
+            or "error" in data
+            or "detail" in data  # FastAPI 标准错误响应
+        )
+        assert has_error, f"响应应该包含错误信息: {data}"
         return data
 
     @staticmethod

@@ -3,11 +3,48 @@
 """
 from datetime import datetime
 from enum import Enum
-from sqlalchemy import Column, String, DateTime, Text, JSON, Index
-from sqlalchemy.dialects.postgresql import UUID, INET
+from sqlalchemy import Column, String, DateTime, Text, JSON, Index, TypeDecorator
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, INET as PG_INET
 import uuid
 
 from models.base import Base
+
+
+class GUID(TypeDecorator):
+    """跨数据库兼容的 UUID 类型"""
+    impl = String(36)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None:
+            if isinstance(value, uuid.UUID):
+                return str(value)
+            return str(value)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is not None:
+            if not isinstance(value, uuid.UUID):
+                return uuid.UUID(value)
+        return value
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(PG_UUID(as_uuid=True))
+        else:
+            return dialect.type_descriptor(String(36))
+
+
+class IPAddress(TypeDecorator):
+    """跨数据库兼容的 IP 地址类型"""
+    impl = String(45)  # 支持 IPv6
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(PG_INET())
+        else:
+            return dialect.type_descriptor(String(45))
 
 
 class AuditEventType(str, Enum):
@@ -84,7 +121,7 @@ class AuditLog(Base):
 
     __tablename__ = "audit_logs"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
 
     # 事件信息
     event_type = Column(String(50), nullable=False, index=True)
@@ -92,14 +129,14 @@ class AuditLog(Base):
     message = Column(Text, nullable=False)
 
     # 主体信息（谁）
-    tenant_id = Column(UUID(as_uuid=True), index=True)  # 租户ID
-    user_id = Column(UUID(as_uuid=True), index=True)    # 用户ID（可选）
-    admin_id = Column(UUID(as_uuid=True), index=True)   # 管理员ID（可选）
+    tenant_id = Column(GUID(), index=True)  # 租户ID
+    user_id = Column(GUID(), index=True)    # 用户ID（可选）
+    admin_id = Column(GUID(), index=True)   # 管理员ID（可选）
     actor_type = Column(String(20))  # tenant/admin/system
     actor_name = Column(String(255))  # 操作者名称
 
     # 请求信息（从哪里）
-    ip_address = Column(INET)  # IP地址
+    ip_address = Column(IPAddress())  # IP地址
     user_agent = Column(Text)  # 用户代理
     request_id = Column(String(50), index=True)  # 请求ID（用于关联）
 
