@@ -286,11 +286,16 @@ mkdir -p /app/test-reports/coverage-html
 mkdir -p /app/test-reports/logs
 rm -f /app/test-reports/*.xml /app/test-reports/*.html
 
+# 设置Python路径
+export PYTHONPATH=/app:$PYTHONPATH
+
 # 运行测试
 echo ""
 echo "=========================================="
 echo "  开始运行测试套件"
 echo "=========================================="
+echo ""
+echo "[INFO] PYTHONPATH: $PYTHONPATH"
 echo ""
 
 cd /app
