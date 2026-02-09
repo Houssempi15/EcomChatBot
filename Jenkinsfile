@@ -269,15 +269,19 @@ echo "  - Python版本: $(python --version)"
 echo "  - 工作目录: $(pwd)"
 echo ""
 
-# 检查pytest是否已安装
-echo "[INFO] 检查测试依赖..."
-if ! python -c "import pytest" 2>/dev/null; then
-    echo "[WARNING] pytest未安装，正在安装测试依赖..."
-    pip install pytest pytest-asyncio pytest-cov pytest-html httpx faker -q
-    echo "[SUCCESS] 测试依赖安装完成"
-else
-    echo "[SUCCESS] pytest已安装"
-fi
+# 安装测试依赖
+echo "[INFO] 安装测试依赖..."
+pip install -q \
+    pytest \
+    pytest-asyncio \
+    pytest-cov \
+    pytest-html \
+    httpx \
+    faker \
+    aiosqlite \
+    || echo "[WARNING] 部分依赖安装失败，继续执行"
+
+echo "[SUCCESS] 测试依赖准备完成"
 
 # 创建测试报告目录
 echo ""
