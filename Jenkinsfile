@@ -319,6 +319,7 @@ pytest tests/ \
     --cov-report=xml:/app/test-reports/coverage.xml \
     --cov-report=term-missing:skip-covered \
     -m "not slow" \
+    --continue-on-collection-errors \
     2>&1 | tee /app/test-reports/logs/test-output.log || TEST_EXIT_CODE=$?
 
 echo ""
