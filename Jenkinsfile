@@ -202,8 +202,8 @@ pipeline {
                     def testCommand = ''
                     switch(params.TEST_LEVEL) {
                         case 'quick':
-                            // 使用 \\( \\) 转义括号，或者不使用括号
-                            testCommand = 'pytest -m "not slow and not performance and not security" --html=reports/html/report.html --self-contained-html --junitxml=reports/junit.xml -n 0'
+                            // 使用单引号包裹表达式，避免引号冲突
+                            testCommand = "pytest -m 'not slow and not performance and not security' --html=reports/html/report.html --self-contained-html --junitxml=reports/junit.xml -n 0"
                             break
                         case 'api':
                             testCommand = 'pytest api/ --html=reports/html/report.html --self-contained-html --junitxml=reports/junit.xml -n 0'
@@ -212,10 +212,10 @@ pipeline {
                             testCommand = 'pytest integration/ --html=reports/html/report.html --self-contained-html --junitxml=reports/junit.xml -n 0'
                             break
                         case 'performance':
-                            testCommand = 'pytest -m performance --html=reports/html/report.html --self-contained-html --junitxml=reports/junit.xml -n 0'
+                            testCommand = "pytest -m 'performance' --html=reports/html/report.html --self-contained-html --junitxml=reports/junit.xml -n 0"
                             break
                         case 'security':
-                            testCommand = 'pytest -m security --html=reports/html/report.html --self-contained-html --junitxml=reports/junit.xml -n 0'
+                            testCommand = "pytest -m 'security' --html=reports/html/report.html --self-contained-html --junitxml=reports/junit.xml -n 0"
                             break
                         case 'full':
                         default:
