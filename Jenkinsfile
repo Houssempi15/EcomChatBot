@@ -1,267 +1,415 @@
 pipeline {
     agent any
-
+    
+    // 环境变量配置
     environment {
         // 项目配置
-        PROJECT_NAME = 'ecom-chatbot'
-        DEPLOY_PATH = '/opt/projects/ecom-chat-bot'
+        PROJECT_NAME = 'ecom-chat-bot'
+        PYTHON_VERSION = '3.11'
+        
+        // 测试环境配置
+        TEST_ENV = 'production'
+        TEST_BASE_URL = 'http://115.190.75.88:8000'
+        
+        // Conda环境
+        CONDA_ENV = 'ecom-chat-bot'
+        
+        // 报告目录
+        REPORT_DIR = 'backend/tests/reports'
+        
+        // 通知配置（根据需要配置）
+        NOTIFICATION_EMAIL = credentials('notification-email')
+        DINGTALK_WEBHOOK = credentials('dingtalk-webhook')
     }
-
+    
+    // 参数化构建
+    parameters {
+        choice(
+            name: 'TEST_LEVEL',
+            choices: ['quick', 'full', 'api', 'integration', 'performance', 'security'],
+            description: '选择测试级别'
+        )
+        booleanParam(
+            name: 'SKIP_SLOW_TESTS',
+            defaultValue: true,
+            description: '是否跳过慢速测试'
+        )
+        booleanParam(
+            name: 'RUN_PERFORMANCE_TESTS',
+            defaultValue: false,
+            description: '是否运行性能测试'
+        )
+        booleanParam(
+            name: 'RUN_SECURITY_TESTS',
+            defaultValue: false,
+            description: '是否运行安全测试'
+        )
+        booleanParam(
+            name: 'CLEANUP_TEST_DATA',
+            defaultValue: true,
+            description: '测试后是否清理测试数据'
+        )
+    }
+    
+    // 构建触发器
+    triggers {
+        // 定时执行：每天凌晨2点执行完整测试
+        cron('0 2 * * *')
+        
+        // Git推送触发（需要配置webhook）
+        // pollSCM('H/5 * * * *')
+    }
+    
+    // 构建选项
     options {
         // 保留最近10次构建
         buildDiscarder(logRotator(numToKeepStr: '10'))
-        // 设置超时时间
-        timeout(time: 30, unit: 'MINUTES')
-        // 禁止并发构建
+        
+        // 超时设置
+        timeout(time: 60, unit: 'MINUTES')
+        
+        // 不允许并发构建
         disableConcurrentBuilds()
-        // 添加时间戳
+        
+        // 时间戳
         timestamps()
+        
+        // 彩色输出
+        ansiColor('xterm')
     }
-
+    
     stages {
-        stage('准备') {
-            steps {
-                echo '=========================================='
-                echo '  电商智能客服系统 - CI/CD Pipeline'
-                echo "  构建编号: ${env.BUILD_NUMBER}"
-                echo "  Git分支: ${env.GIT_BRANCH}"
-                echo "  提交ID: ${env.GIT_COMMIT}"
-                echo '=========================================='
-            }
-        }
-
-        stage('同步代码') {
+        stage('准备环境') {
             steps {
                 script {
-                    echo '>>> 同步代码到部署目录...'
-                    sh '''
-                        echo "源目录: ${WORKSPACE}"
-                        echo "目标目录: ${DEPLOY_PATH}"
+                    echo "🚀 开始构建 - ${env.BUILD_NUMBER}"
+                    echo "📌 Git Branch: ${env.GIT_BRANCH}"
+                    echo "📌 Git Commit: ${env.GIT_COMMIT}"
+                    echo "📌 测试级别: ${params.TEST_LEVEL}"
+                }
+                
+                // 清理工作空间（可选）
+                // cleanWs()
+                
+                // 检出代码
+                checkout scm
+                
+                // 显示项目信息
+                sh '''
+                    echo "==================================="
+                    echo "项目: ${PROJECT_NAME}"
+                    echo "Python版本: ${PYTHON_VERSION}"
+                    echo "测试环境: ${TEST_ENV}"
+                    echo "==================================="
+                '''
+            }
+        }
+        
+        stage('检查环境') {
+            steps {
+                sh '''
+                    # 检查Python和Conda
+                    python3 --version || echo "Python3未安装"
+                    conda --version || echo "Conda未安装"
+                    
+                    # 检查测试环境URL
+                    curl -s ${TEST_BASE_URL}/health || echo "测试环境不可访问"
+                '''
+            }
+        }
+        
+        stage('安装依赖') {
+            steps {
+                script {
+                    echo "📦 安装测试依赖..."
+                }
+                
+                sh '''
+                    # 激活conda环境（如果不存在则创建）
+                    if conda env list | grep -q "^${CONDA_ENV} "; then
+                        echo "Conda环境已存在"
+                    else
+                        echo "创建Conda环境"
+                        conda create -n ${CONDA_ENV} python=${PYTHON_VERSION} -y
+                    fi
+                    
+                    # 激活环境并安装依赖
+                    source activate ${CONDA_ENV}
+                    cd backend/tests
+                    pip install -r requirements-test.txt -q
+                    
+                    echo "✓ 依赖安装完成"
+                '''
+            }
+        }
+        
+        stage('配置测试环境') {
+            steps {
+                script {
+                    echo "⚙️ 配置测试环境变量..."
+                }
+                
+                sh '''
+                    cd backend/tests
+                    
+                    # 创建测试配置文件
+                    cat > .env.test.local << EOF
+# Jenkins CI 测试配置
+TEST_BASE_URL=${TEST_BASE_URL}
+TEST_API_PREFIX=/api/v1
 
-                        # 确保目标目录存在
-                        mkdir -p ${DEPLOY_PATH}
+# 超时设置
+TEST_REQUEST_TIMEOUT=30
+TEST_LLM_REQUEST_TIMEOUT=60
 
-                        # 使用rsync同步（排除.git目录）
-                        rsync -av --delete \
-                            --exclude='.git' \
-                            --exclude='*.pyc' \
-                            --exclude='__pycache__' \
-                            --exclude='.env' \
-                            ${WORKSPACE}/ ${DEPLOY_PATH}/
+# 测试控制
+TEST_CLEANUP_AFTER_TEST=${CLEANUP_TEST_DATA}
+TEST_SKIP_PERFORMANCE=${!RUN_PERFORMANCE_TESTS}
+TEST_SKIP_SECURITY=${!RUN_SECURITY_TESTS}
 
-                        echo ""
-                        echo "✓ 代码同步完成"
-                        echo "部署目录内容:"
-                        ls -la ${DEPLOY_PATH}/ | head -15
-                    '''
+# 日志级别
+TEST_LOG_LEVEL=INFO
+
+# 测试租户前缀
+TEST_TENANT_PREFIX=ci_test_
+
+# 并发设置
+TEST_MAX_CONCURRENT=10
+EOF
+                    
+                    echo "✓ 配置文件已创建"
+                    cat .env.test.local
+                '''
+            }
+        }
+        
+        stage('运行测试') {
+            steps {
+                script {
+                    echo "🧪 执行测试套件..."
+                    
+                    // 根据参数选择测试级别
+                    def testCommand = ''
+                    switch(params.TEST_LEVEL) {
+                        case 'quick':
+                            testCommand = 'pytest -m "not slow and not performance and not security" --html=reports/html/report.html --self-contained-html --junitxml=reports/junit.xml'
+                            break
+                        case 'api':
+                            testCommand = 'pytest api/ --html=reports/html/report.html --self-contained-html --junitxml=reports/junit.xml'
+                            break
+                        case 'integration':
+                            testCommand = 'pytest integration/ --html=reports/html/report.html --self-contained-html --junitxml=reports/junit.xml'
+                            break
+                        case 'performance':
+                            testCommand = 'pytest -m performance --html=reports/html/report.html --self-contained-html --junitxml=reports/junit.xml'
+                            break
+                        case 'security':
+                            testCommand = 'pytest -m security --html=reports/html/report.html --self-contained-html --junitxml=reports/junit.xml'
+                            break
+                        case 'full':
+                        default:
+                            testCommand = 'pytest --html=reports/html/report.html --self-contained-html --junitxml=reports/junit.xml --cov=. --cov-report=html:reports/coverage --cov-report=term-missing'
+                            break
+                    }
+                    
+                    sh """
+                        source activate ${CONDA_ENV}
+                        cd backend/tests
+                        
+                        # 创建报告目录
+                        mkdir -p reports/html reports/coverage
+                        
+                        # 执行测试
+                        ${testCommand} || true
+                        
+                        echo "✓ 测试执行完成"
+                    """
                 }
             }
         }
-
-        stage('Docker配置检查') {
+        
+        stage('收集测试报告') {
             steps {
                 script {
-                    echo '>>> 检查Docker配置...'
-                    sh '''
-                        cd ${DEPLOY_PATH}
-                        docker-compose config -q
-                        echo "✓ Docker配置检查通过"
-                    '''
+                    echo "📊 收集测试报告..."
+                }
+                
+                // 发布JUnit测试报告
+                junit allowEmptyResults: true, testResults: 'backend/tests/reports/junit.xml'
+                
+                // 发布HTML报告
+                publishHTML([
+                    allowMissing: false,
+                    alwaysLinkToLastBuild: true,
+                    keepAll: true,
+                    reportDir: 'backend/tests/reports/html',
+                    reportFiles: 'report.html',
+                    reportName: '测试报告',
+                    reportTitles: '自动化测试报告'
+                ])
+                
+                // 发布覆盖率报告（如果存在）
+                publishHTML([
+                    allowMissing: true,
+                    alwaysLinkToLastBuild: true,
+                    keepAll: true,
+                    reportDir: 'backend/tests/reports/coverage',
+                    reportFiles: 'index.html',
+                    reportName: '覆盖率报告',
+                    reportTitles: '代码覆盖率报告'
+                ])
+                
+                // 归档测试报告
+                archiveArtifacts artifacts: 'backend/tests/reports/**/*', allowEmptyArchive: true
+            }
+        }
+        
+        stage('分析测试结果') {
+            steps {
+                script {
+                    echo "📈 分析测试结果..."
+                    
+                    // 获取测试统计
+                    def testResults = junit 'backend/tests/reports/junit.xml'
+                    
+                    // 计算测试指标
+                    def totalTests = testResults.totalCount
+                    def passedTests = testResults.passCount
+                    def failedTests = testResults.failCount
+                    def skippedTests = testResults.skipCount
+                    def passRate = totalTests > 0 ? (passedTests / totalTests * 100).round(2) : 0
+                    
+                    echo """
+                    ========================================
+                    测试结果统计:
+                    ----------------------------------------
+                    总测试数: ${totalTests}
+                    通过: ${passedTests}
+                    失败: ${failedTests}
+                    跳过: ${skippedTests}
+                    通过率: ${passRate}%
+                    ========================================
+                    """
+                    
+                    // 保存到环境变量供后续使用
+                    env.TOTAL_TESTS = totalTests
+                    env.PASSED_TESTS = passedTests
+                    env.FAILED_TESTS = failedTests
+                    env.PASS_RATE = passRate
+                    
+                    // 判断构建结果
+                    if (failedTests > 0) {
+                        currentBuild.result = 'UNSTABLE'
+                        echo "⚠️ 有测试失败，构建状态设置为 UNSTABLE"
+                    }
+                    
+                    // 如果通过率低于阈值，标记为失败
+                    if (passRate < 80) {
+                        currentBuild.result = 'FAILURE'
+                        error "❌ 测试通过率低于80%，构建失败"
+                    }
                 }
             }
         }
-
-        stage('检查是否需要重建镜像') {
-            steps {
-                script {
-                    echo '>>> 检查是否需要重建镜像...'
-                    env.NEED_REBUILD = sh(
-                        script: '''
-                            cd ${DEPLOY_PATH}
-
-                            # 检查 requirements.txt 或 Dockerfile 是否变化
-                            if git diff HEAD~1 HEAD --name-only | grep -E 'requirements.txt|Dockerfile|docker-entrypoint.sh'; then
-                                echo "检测到依赖文件变化，需要重建镜像"
-                                echo "true"
-                            else
-                                # 检查镜像是否存在
-                                if docker images | grep -q "ecom-chat-bot_api"; then
-                                    echo "镜像已存在且依赖未变化，跳过构建"
-                                    echo "false"
-                                else
-                                    echo "镜像不存在，需要构建"
-                                    echo "true"
-                                fi
-                            fi
-                        ''',
-                        returnStdout: true
-                    ).trim()
-
-                    echo "是否需要重建: ${env.NEED_REBUILD}"
-                }
-            }
-        }
-
-        stage('构建镜像') {
-            when {
-                expression { env.NEED_REBUILD == 'true' }
-            }
-            steps {
-                script {
-                    echo '>>> 构建Docker镜像...'
-                    echo '⚠️  注意: 首次构建需要下载 1.5GB 依赖，可能需要 20-40 分钟'
-                    sh '''
-                        cd ${DEPLOY_PATH}
-                        echo "构建开始时间: $(date '+%Y-%m-%d %H:%M:%S')"
-
-                        echo "=========================================="
-                        echo "正在构建镜像... 请耐心等待"
-                        echo "=========================================="
-
-                        docker-compose build 2>&1 | while read line; do
-                            echo "$line"
-                            if [ $((RANDOM % 100)) -eq 0 ]; then
-                                echo "[$(date '+%H:%M:%S')] 构建进行中..."
-                            fi
-                        done || {
-                            echo "❌ 镜像构建失败"
-                            exit 1
-                        }
-
-                        echo ""
-                        echo "构建完成时间: $(date '+%Y-%m-%d %H:%M:%S')"
-                        echo "✓ 镜像构建完成"
-                    '''
-                }
-            }
-        }
-
-        stage('部署新服务') {
-            steps {
-                script {
-                    echo '>>> 部署新版本...'
-                    sh '''
-                        cd ${DEPLOY_PATH}
-
-                        echo ">>> 停止所有旧服务..."
-                        docker-compose down || true
-
-                        echo ">>> 启动所有服务（强制重建）..."
-                        docker-compose up -d --force-recreate --remove-orphans
-
-                        # 清理未使用的镜像
-                        docker image prune -f || true
-
-                        echo "✓ 新服务已启动"
-                    '''
-                }
-            }
-        }
-
-        stage('健康检查') {
-            steps {
-                script {
-                    echo '>>> 执行健康检查...'
-                    sh '''
-                        cd ${DEPLOY_PATH}
-
-                        echo "等待服务完全启动..."
-                        sleep 30
-
-                        echo "=== 服务状态 ==="
-                        docker-compose ps
-
-                        echo ""
-                        echo "=== API健康检查 ==="
-                        max_attempts=10
-                        attempt=0
-
-                        while [ $attempt -lt $max_attempts ]; do
-                            if curl -f -s http://localhost:8000/docs > /dev/null 2>&1; then
-                                echo "✓ API服务健康检查通过"
-                                echo "  API地址: http://localhost:8000"
-                                echo "  API文档: http://localhost:8000/docs"
-                                exit 0
-                            fi
-                            echo "等待API服务启动... ($attempt/$max_attempts)"
-                            sleep 10
-                            attempt=$((attempt + 1))
-                        done
-
-                        echo "⚠ API服务启动超时，但部署已完成"
-                        echo "  请手动检查服务状态"
-                        exit 0
-                    '''
-                }
-            }
-        }
-
-        stage('部署验证') {
-            steps {
-                script {
-                    echo '>>> 部署后验证...'
-                    sh '''
-                        cd ${DEPLOY_PATH}
-
-                        echo "=== 最终服务状态 ==="
-                        docker-compose ps
-
-                        echo ""
-                        echo "=== API服务日志（最后20行）==="
-                        docker-compose logs --tail=20 api || true
-
-                        echo ""
-                        echo "=== 部署完成时间 ==="
-                        date '+%Y-%m-%d %H:%M:%S'
-                    '''
-                }
-            }
-        }
-
-        // 测试阶段暂时禁用，待测试用例修复后再启用
-        // stage('执行测试') { ... }
     }
-
+    
     post {
         always {
             script {
-                echo '>>> 构建流程结束'
+                echo "🧹 清理环境..."
             }
+            
+            // 清理临时文件（可选）
+            sh '''
+                cd backend/tests
+                rm -f .env.test.local
+            '''
         }
-
+        
         success {
             script {
-                echo '=========================================='
-                echo '  部署成功！'
-                echo "  构建编号: ${env.BUILD_NUMBER}"
-                echo "  Git分支: ${env.GIT_BRANCH}"
-                echo "  提交ID: ${env.GIT_COMMIT}"
-                echo '  '
-                echo '  访问地址:'
-                echo '  API服务: http://localhost:8000'
-                echo '  API文档: http://localhost:8000/docs'
-                echo '=========================================='
+                echo "✅ 构建成功！"
+                
+                // 发送成功通知
+                sendNotification('SUCCESS')
             }
         }
-
+        
         failure {
             script {
-                echo '=========================================='
-                echo '  ❌ 构建失败！'
-                echo "  构建编号: ${env.BUILD_NUMBER}"
-                echo '  请检查日志以获取详细信息'
-                echo '=========================================='
-
-                sh """
-                    cd ${DEPLOY_PATH}
-                    echo "=== 错误诊断信息 ==="
-                    echo "服务状态:"
-                    docker-compose ps || true
-                    echo ""
-                    echo "最近日志:"
-                    docker-compose logs --tail=30 || true
-                """
+                echo "❌ 构建失败！"
+                
+                // 发送失败通知
+                sendNotification('FAILURE')
             }
         }
+        
+        unstable {
+            script {
+                echo "⚠️ 构建不稳定！"
+                
+                // 发送警告通知
+                sendNotification('UNSTABLE')
+            }
+        }
+        
+        cleanup {
+            // 最终清理
+            cleanWs(
+                cleanWhenNotBuilt: false,
+                deleteDirs: true,
+                disableDeferredWipeout: true,
+                notFailBuild: true
+            )
+        }
+    }
+}
+
+// 通知函数
+def sendNotification(String status) {
+    def color = status == 'SUCCESS' ? 'good' : (status == 'UNSTABLE' ? 'warning' : 'danger')
+    def emoji = status == 'SUCCESS' ? '✅' : (status == 'UNSTABLE' ? '⚠️' : '❌')
+    
+    def message = """
+${emoji} 测试构建 ${status}
+
+📋 项目: ${env.PROJECT_NAME}
+🔢 构建: #${env.BUILD_NUMBER}
+🌿 分支: ${env.GIT_BRANCH}
+📊 测试级别: ${params.TEST_LEVEL}
+
+📈 测试统计:
+- 总数: ${env.TOTAL_TESTS}
+- 通过: ${env.PASSED_TESTS}
+- 失败: ${env.FAILED_TESTS}
+- 通过率: ${env.PASS_RATE}%
+
+🔗 报告: ${env.BUILD_URL}测试报告
+⏱️ 耗时: ${currentBuild.durationString}
+    """
+    
+    // 邮件通知
+    if (env.NOTIFICATION_EMAIL) {
+        emailext(
+            subject: "${emoji} ${env.PROJECT_NAME} - 构建 #${env.BUILD_NUMBER} ${status}",
+            body: message,
+            to: env.NOTIFICATION_EMAIL,
+            recipientProviders: [developers(), requestor()]
+        )
+    }
+    
+    // 钉钉通知
+    if (env.DINGTALK_WEBHOOK) {
+        sh """
+            curl -X POST ${env.DINGTALK_WEBHOOK} \
+            -H 'Content-Type: application/json' \
+            -d '{
+                "msgtype": "markdown",
+                "markdown": {
+                    "title": "测试构建${status}",
+                    "text": "${message.replace('"', '\\"').replace('\n', '\\n')}"
+                }
+            }'
+        """
     }
 }
