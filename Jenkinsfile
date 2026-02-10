@@ -17,9 +17,9 @@ pipeline {
         // 报告目录
         REPORT_DIR = 'backend/tests/reports'
         
-        // 通知配置（根据需要配置）
-        NOTIFICATION_EMAIL = credentials('notification-email')
-        DINGTALK_WEBHOOK = credentials('dingtalk-webhook')
+        // 通知配置（可选，需要在 Jenkins 中配置 credentials）
+        // NOTIFICATION_EMAIL = credentials('notification-email')
+        // DINGTALK_WEBHOOK = credentials('dingtalk-webhook')
     }
     
     // 参数化构建
@@ -314,13 +314,17 @@ EOF
         always {
             script {
                 echo "🧹 清理环境..."
+                
+                // 清理临时文件（可选）
+                try {
+                    sh '''
+                        cd backend/tests
+                        rm -f .env.test.local
+                    '''
+                } catch (Exception e) {
+                    echo "清理临时文件失败: ${e.message}"
+                }
             }
-            
-            // 清理临时文件（可选）
-            sh '''
-                cd backend/tests
-                rm -f .env.test.local
-            '''
         }
         
         success {
@@ -328,7 +332,11 @@ EOF
                 echo "✅ 构建成功！"
                 
                 // 发送成功通知
-                sendNotification('SUCCESS')
+                try {
+                    sendNotification('SUCCESS')
+                } catch (Exception e) {
+                    echo "发送成功通知失败: ${e.message}"
+                }
             }
         }
         
@@ -337,7 +345,11 @@ EOF
                 echo "❌ 构建失败！"
                 
                 // 发送失败通知
-                sendNotification('FAILURE')
+                try {
+                    sendNotification('FAILURE')
+                } catch (Exception e) {
+                    echo "发送失败通知失败: ${e.message}"
+                }
             }
         }
         
@@ -346,18 +358,25 @@ EOF
                 echo "⚠️ 构建不稳定！"
                 
                 // 发送警告通知
-                sendNotification('UNSTABLE')
+                try {
+                    sendNotification('UNSTABLE')
+                } catch (Exception e) {
+                    echo "发送警告通知失败: ${e.message}"
+                }
             }
         }
         
         cleanup {
-            // 最终清理
-            cleanWs(
-                cleanWhenNotBuilt: false,
-                deleteDirs: true,
-                disableDeferredWipeout: true,
-                notFailBuild: true
-            )
+            script {
+                echo "🧹 最终清理..."
+                // 最终清理（可选）
+                // cleanWs(
+                //     cleanWhenNotBuilt: false,
+                //     deleteDirs: true,
+                //     disableDeferredWipeout: true,
+                //     notFailBuild: true
+                // )
+            }
         }
     }
 }
@@ -367,46 +386,53 @@ def sendNotification(String status) {
     def color = status == 'SUCCESS' ? 'good' : (status == 'UNSTABLE' ? 'warning' : 'danger')
     def emoji = status == 'SUCCESS' ? '✅' : (status == 'UNSTABLE' ? '⚠️' : '❌')
     
+    def totalTests = env.TOTAL_TESTS ?: '0'
+    def passedTests = env.PASSED_TESTS ?: '0'
+    def failedTests = env.FAILED_TESTS ?: '0'
+    def passRate = env.PASS_RATE ?: '0'
+    
     def message = """
 ${emoji} 测试构建 ${status}
 
 📋 项目: ${env.PROJECT_NAME}
 🔢 构建: #${env.BUILD_NUMBER}
-🌿 分支: ${env.GIT_BRANCH}
+🌿 分支: ${env.GIT_BRANCH ?: 'unknown'}
 📊 测试级别: ${params.TEST_LEVEL}
 
 📈 测试统计:
-- 总数: ${env.TOTAL_TESTS}
-- 通过: ${env.PASSED_TESTS}
-- 失败: ${env.FAILED_TESTS}
-- 通过率: ${env.PASS_RATE}%
+- 总数: ${totalTests}
+- 通过: ${passedTests}
+- 失败: ${failedTests}
+- 通过率: ${passRate}%
 
 🔗 报告: ${env.BUILD_URL}测试报告
 ⏱️ 耗时: ${currentBuild.durationString}
     """
     
-    // 邮件通知
-    if (env.NOTIFICATION_EMAIL) {
-        emailext(
-            subject: "${emoji} ${env.PROJECT_NAME} - 构建 #${env.BUILD_NUMBER} ${status}",
-            body: message,
-            to: env.NOTIFICATION_EMAIL,
-            recipientProviders: [developers(), requestor()]
-        )
-    }
+    echo "通知内容:\n${message}"
     
-    // 钉钉通知
-    if (env.DINGTALK_WEBHOOK) {
-        sh """
-            curl -X POST ${env.DINGTALK_WEBHOOK} \
-            -H 'Content-Type: application/json' \
-            -d '{
-                "msgtype": "markdown",
-                "markdown": {
-                    "title": "测试构建${status}",
-                    "text": "${message.replace('"', '\\"').replace('\n', '\\n')}"
-                }
-            }'
-        """
-    }
+    // 邮件通知（需要配置 credentials 和安装 Email Extension 插件）
+    // if (env.NOTIFICATION_EMAIL) {
+    //     emailext(
+    //         subject: "${emoji} ${env.PROJECT_NAME} - 构建 #${env.BUILD_NUMBER} ${status}",
+    //         body: message,
+    //         to: env.NOTIFICATION_EMAIL,
+    //         recipientProviders: [developers(), requestor()]
+    //     )
+    // }
+    
+    // 钉钉通知（需要配置 credentials）
+    // if (env.DINGTALK_WEBHOOK) {
+    //     sh """
+    //         curl -X POST ${env.DINGTALK_WEBHOOK} \
+    //         -H 'Content-Type: application/json' \
+    //         -d '{
+    //             "msgtype": "markdown",
+    //             "markdown": {
+    //                 "title": "测试构建${status}",
+    //                 "text": "${message.replace('"', '\\"').replace('\n', '\\n')}"
+    //             }
+    //         }'
+    //     """
+    // }
 }
