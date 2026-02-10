@@ -312,7 +312,8 @@ pipeline {
                     def passedTests = testResults.passCount
                     def failedTests = testResults.failCount
                     def skippedTests = testResults.skipCount
-                    def passRate = totalTests > 0 ? (passedTests / totalTests * 100).round(2) : 0
+                    // 修复: 使用 Math.round() 而不是 BigDecimal.round()
+                    def passRate = totalTests > 0 ? Math.round((passedTests / totalTests * 100) * 100) / 100 : 0
                     
                     echo """
                     ========================================
