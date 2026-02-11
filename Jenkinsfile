@@ -225,7 +225,10 @@ pipeline {
                     
                     sh """
                         # 在 Docker 容器中运行测试
+                        # 使用 --network host 解决容器无法访问宿主机上被测服务的问题
+                        # （Jenkins 与 API 同机时，容器访问公网 IP 会因 hairpin NAT 失败）
                         docker run --rm \
+                            --network host \
                             -v \${WORKSPACE}:/workspace \
                             -w /workspace/backend/tests \
                             -e TEST_BASE_URL=\${TEST_BASE_URL} \
