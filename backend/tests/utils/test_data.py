@@ -149,6 +149,16 @@ class TestDataGenerator:
                 "use_case": "chat",
                 "is_default": True,
             },
+            "deepseek": {
+                "provider": "deepseek",
+                "model_name": "deepseek-chat",
+                "api_key": api_key,
+                "api_base": "https://api.deepseek.com",
+                "temperature": 0.7,
+                "max_tokens": 2000,
+                "use_case": "chat",
+                "is_default": True,
+            },
             "anthropic": {
                 "provider": "anthropic",
                 "model_name": "claude-3-5-sonnet-20240620",
