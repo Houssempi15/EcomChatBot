@@ -46,31 +46,22 @@ pipeline {
     // ============================================
     // 触发器配置
     // ============================================
-    // 注意: 需要安装 Generic Webhook Trigger 插件才能使用Webhook自动触发
-    // 如果未安装插件，可以注释掉整个 triggers 块，使用手动触发
+    // 注意: 自动触发需要配置相应的触发器
+    // 方式1: 手动触发 - 直接注释整个 triggers 块（最简单）
+    // 方式2: Gitee触发 - 需要在Job配置中启用Gitee插件触发
+    // 方式3: Generic Webhook - 需要安装Generic Webhook Trigger插件
+    
+    // 当前配置: 暂时禁用自动触发，使用手动触发
+    // 如需自动触发，请在Jenkins Job配置页面的"Build Triggers"中配置
+    /*
     triggers {
-        // Webhook触发 - 需要安装 Generic Webhook Trigger 插件
-        // 临时禁用: 如果插件未安装，请注释下面的 GenericTrigger 配置
-        /* 
-        GenericTrigger(
-            genericVariables: [
-                [key: 'ref', value: '$.ref'],
-                [key: 'repository', value: '$.repository.name']
-            ],
-            causeString: 'Triggered by Git push to develop',
-            token: 'ecom-chatbot-deploy-token',
-            regexpFilterText: '$ref',
-            regexpFilterExpression: 'refs/heads/develop'
-        )
-        */
-        
-        // 替代方案: 使用Gitee触发器（如果您使用Gitee）
         gitee(
             triggerOnPush: true,
-            branchFilter: 'develop',
+            branchFilterName: 'develop',
             noteRegex: ''
         )
     }
+    */
     
     // ============================================
     // 构建选项
