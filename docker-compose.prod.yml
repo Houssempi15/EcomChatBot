@@ -1,0 +1,91 @@
+version: '3.8'
+
+# 生产环境 Docker Compose 配置
+# 用于 Jenkins CI/CD 自动部署
+
+services:
+  # FastAPI 应用
+  api:
+    image: ecom-chat-bot-api:${BUILD_NUMBER:-latest}
+    container_name: ecom-chatbot-api
+    restart: unless-stopped
+    environment:
+      # 数据库连接
+      DATABASE_URL: postgresql+asyncpg://ecom_user:ecom_password@postgres:5432/ecom_chatbot
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: ecom_user
+      POSTGRES_PASSWORD: ecom_password
+      POSTGRES_DB: ecom_chatbot
+      
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+      
+      # Milvus
+      MILVUS_HOST: milvus
+      MILVUS_PORT: 19530
+      
+      # RabbitMQ
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      
+      # Celery
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      
+      # 不运行初始化（生产环境已初始化）
+      RUN_INIT_DB: "false"
+      RUN_MIGRATIONS: "false"
+    env_file:
+      - /opt/ecom-chat-bot/shared/.env.production
+    ports:
+      - "8000:8000"
+    networks:
+      - ecom-network
+    depends_on:
+      - postgres
+      - redis
+      - milvus
+      - rabbitmq
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    volumes:
+      - /opt/ecom-chat-bot/shared/logs:/app/logs
+
+  # Celery Worker
+  celery-worker:
+    image: ecom-chat-bot-api:${BUILD_NUMBER:-latest}
+    container_name: ecom-chatbot-celery
+    restart: unless-stopped
+    command: celery -A tasks.celery_app worker --loglevel=info
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ecom_user:ecom_password@postgres:5432/ecom_chatbot
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: ecom_user
+      POSTGRES_PASSWORD: ecom_password
+      POSTGRES_DB: ecom_chatbot
+      RUN_INIT_DB: "false"
+      RUN_MIGRATIONS: "false"
+    env_file:
+      - /opt/ecom-chat-bot/shared/.env.production
+    networks:
+      - ecom-network
+    depends_on:
+      - redis
+      - postgres
+    volumes:
+      - /opt/ecom-chat-bot/shared/logs:/app/logs
+
+networks:
+  ecom-network:
+    external: true
+
+# 注意：
+# 1. 基础服务(postgres, redis, milvus, rabbitmq)由主 docker-compose.yml 管理
+# 2. 本配置仅管理应用服务(api, celery-worker)
+# 3. BUILD_NUMBER 由 Jenkins 传入，用于版本标记
