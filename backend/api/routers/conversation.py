@@ -4,6 +4,7 @@
 from fastapi import APIRouter, Query
 
 from api.dependencies import DBDep, TenantDep
+from api.middleware import ConcurrentQuotaDep, ConversationQuotaDep
 from schemas import (
     ApiResponse,
     ConversationCreate,
@@ -22,44 +23,24 @@ router = APIRouter(prefix="/conversation", tags=["对话管理"])
 @router.post("/create", response_model=ApiResponse[ConversationResponse])
 async def create_conversation(
     conversation_data: ConversationCreate,
-    tenant_id: TenantDep,
+    tenant_id: ConcurrentQuotaDep,  # 检查并发会话配额
     db: DBDep,
 ):
-    """创建会话"""
+    """
+    创建会话
+
+    - **user_id**: 用户ID
+    - **channel**: 渠道(web/app等)
+    - **metadata**: 元数据(可选)
+
+    ⚠️ 会检查并发会话数配额
+    """
     service = ConversationService(db, tenant_id)
     conversation = await service.create_conversation(
         user_external_id=conversation_data.user_id,
         channel=conversation_data.channel,
     )
     return ApiResponse(data=conversation)
-
-
-@router.get(
-    "/{conversation_id}",
-    response_model=ApiResponse[ConversationDetailResponse],
-)
-async def get_conversation(
-    conversation_id: str,
-    tenant_id: TenantDep,
-    db: DBDep,
-):
-    """获取会话详情"""
-    service = ConversationService(db, tenant_id)
-    conversation = await service.get_conversation(conversation_id)
-
-    # 获取消息列表
-    messages = await service.get_messages(conversation_id)
-
-    # 获取用户信息
-    user = await service.get_or_create_user(conversation.user.user_external_id)
-
-    response = ConversationDetailResponse(
-        **conversation.__dict__,
-        messages=messages,
-        user=user,
-    )
-
-    return ApiResponse(data=response)
 
 
 @router.get("/list", response_model=ApiResponse[PaginatedResponse[ConversationResponse]])
@@ -90,6 +71,39 @@ async def list_conversations(
     return ApiResponse(data=paginated)
 
 
+@router.get(
+    "/{conversation_id}",
+    response_model=ApiResponse[ConversationDetailResponse],
+)
+async def get_conversation(
+    conversation_id: str,
+    tenant_id: TenantDep,
+    db: DBDep,
+):
+    """获取会话详情"""
+    service = ConversationService(db, tenant_id)
+    conversation = await service.get_conversation(conversation_id)
+
+    # 获取消息列表
+    messages = await service.get_messages(conversation_id)
+
+    # 获取用户信息
+    user = await service.get_or_create_user(conversation.user.user_external_id)
+
+    # 构建响应，避免字段重复
+    conv_dict = {k: v for k, v in conversation.__dict__.items() if not k.startswith('_')}
+    conv_dict.pop('messages', None)  # 移除可能存在的 messages 字段
+    conv_dict.pop('user', None)  # 移除可能存在的 user 字段
+    
+    response = ConversationDetailResponse(
+        **conv_dict,
+        messages=messages,
+        user=user,
+    )
+
+    return ApiResponse(data=response)
+
+
 @router.post(
     "/{conversation_id}/messages",
     response_model=ApiResponse[MessageResponse],
@@ -97,13 +111,15 @@ async def list_conversations(
 async def send_message(
     conversation_id: str,
     message_data: MessageCreate,
-    tenant_id: TenantDep,
+    tenant_id: ConversationQuotaDep,  # 检查对话次数配额
     db: DBDep,
 ):
     """
     发送消息（同步方式）
-    
+
     注：生产环境建议使用 WebSocket 接口实现流式返回
+
+    ⚠️ 会检查对话次数配额
     """
     service = ConversationService(db, tenant_id)
 

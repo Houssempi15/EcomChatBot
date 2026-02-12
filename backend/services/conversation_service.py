@@ -91,11 +91,15 @@ class ConversationService:
 
     async def get_conversation(self, conversation_id: str) -> Conversation:
         """获取会话"""
+        from sqlalchemy.orm import selectinload
+        
         stmt = select(Conversation).where(
             and_(
                 Conversation.tenant_id == self.tenant_id,
                 Conversation.conversation_id == conversation_id,
             )
+        ).options(
+            selectinload(Conversation.user)
         )
         result = await self.db.execute(stmt)
         conversation = result.scalar_one_or_none()

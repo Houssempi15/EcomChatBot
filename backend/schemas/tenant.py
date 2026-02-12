@@ -2,8 +2,9 @@
 租户相关 Schema
 """
 from datetime import datetime
+import json
 
-from pydantic import EmailStr, Field
+from pydantic import EmailStr, Field, field_validator
 
 from schemas.base import BaseSchema, TimestampSchema
 
@@ -99,6 +100,14 @@ class SubscriptionResponse(SubscriptionBase, TimestampSchema):
     expire_at: datetime
     is_trial: bool
 
+    @field_validator('enabled_features', mode='before')
+    @classmethod
+    def parse_enabled_features(cls, v):
+        """将JSON字符串转换为list"""
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
+
 
 # ============ 用量记录 Schema ============
 class UsageRecordResponse(TimestampSchema):
@@ -120,7 +129,9 @@ class QuotaUsageResponse(BaseSchema):
 
     conversation: dict[str, int | float]
     storage: dict[str, float]
-    api: dict[str, int | float]
+    api_call: dict[str, int | float]
+    concurrent: dict[str, int | float]
+    knowledge: dict[str, int | float]
 
 
 # ============ 账单 Schema ============
@@ -173,6 +184,35 @@ class TenantLoginResponse(BaseSchema):
     """租户登录响应"""
 
     access_token: str
+    refresh_token: str | None = None
     token_type: str = "bearer"
     expires_in: int
     tenant_id: str
+
+
+# ============ Token 刷新 ============
+class TokenRefreshRequest(BaseSchema):
+    """刷新 Token 请求"""
+
+    refresh_token: str = Field(..., description="刷新 Token")
+
+
+class TokenRefreshResponse(BaseSchema):
+    """刷新 Token 响应"""
+
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+
+# ============ 登出 ============
+class TenantLogoutRequest(BaseSchema):
+    """登出请求"""
+
+    refresh_token: str | None = Field(None, description="刷新 Token（可选）")
+
+
+class TenantLogoutResponse(BaseSchema):
+    """登出响应"""
+
+    message: str = "登出成功"

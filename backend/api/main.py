@@ -8,7 +8,26 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from api.routers import admin, ai_chat, conversation, intent, knowledge, payment, rag, tenant, websocket
+from api.routers import (
+    admin,
+    ai_chat,
+    analytics,
+    auth,
+    conversation,
+    health,
+    intent,
+    knowledge,
+    model_config,
+    monitor,
+    payment,
+    quality,
+    rag,
+    sensitive_word,
+    statistics,
+    tenant,
+    webhook,
+    websocket,
+)
 from core import AppException, settings
 from db import close_db, close_redis, init_db
 
@@ -19,6 +38,29 @@ async def lifespan(app: FastAPI):
     # 启动时初始化
     await init_db()
     print("✓ 数据库已初始化")
+
+    # 初始化配额服务
+    from db import get_async_session, get_redis
+    from services.quota_service import QuotaService
+    from api.middleware.quota import ConcurrentQuotaManager
+
+    # 创建配额服务实例(使用依赖注入时会创建新实例,这里主要用于并发管理器)
+    redis_client = await get_redis()
+
+    # 初始化并发配额管理器
+    async with get_async_session() as db:
+        quota_service = QuotaService(db)
+        concurrent_manager = ConcurrentQuotaManager(redis_client, quota_service)
+
+        # 将服务添加到app.state以供装饰器使用
+        app.state.concurrent_quota_manager = concurrent_manager
+
+    print("✓ 配额服务已初始化")
+    
+    # 初始化限流中间件
+    from api.middleware.rate_limit import RateLimitMiddleware
+    app.state.redis_client = redis_client
+    print("✓ 限流中间件已初始化")
 
     yield
 
@@ -34,8 +76,9 @@ app = FastAPI(
     version=settings.app_version,
     description="电商智能客服 SaaS 平台 API",
     lifespan=lifespan,
-    docs_url="/docs" if settings.debug else None,
+    docs_url=None,  # 禁用默认的 docs，使用自定义的
     redoc_url="/redoc" if settings.debug else None,
+    swagger_ui_parameters={"defaultModelsExpandDepth": -1},
 )
 
 # CORS 中间件
@@ -46,6 +89,36 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 限流中间件 - 需要在lifespan后通过state添加
+# 实际添加在 @app.on_event("startup") 中进行
+
+# Prometheus中间件
+from utils.prometheus import PrometheusMiddleware, init_app_info
+from api.middleware.logging import RequestLoggingMiddleware
+
+app.add_middleware(PrometheusMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
+
+# 初始化应用信息
+init_app_info(version=settings.app_version, environment=settings.environment)
+
+# 初始化日志系统
+from utils.logger import setup_logging
+
+setup_logging(
+    level=settings.log_level, json_format=(settings.log_format == "json"), log_file=None
+)
+
+# 初始化Sentry
+from utils.sentry import init_sentry
+
+if settings.sentry_dsn:
+    init_sentry(
+        dsn=settings.sentry_dsn,
+        environment=settings.environment,
+        traces_sample_rate=0.1,  # 10%的性能追踪采样率
+    )
 
 
 # 全局异常处理
@@ -121,8 +194,59 @@ async def root():
     }
 
 
+# 自定义 Swagger UI 使用国内 CDN
+if settings.debug:
+    from fastapi.responses import HTMLResponse
+
+    @app.get("/docs", include_in_schema=False)
+    async def custom_swagger_ui_html():
+        """自定义 Swagger UI 使用国内 CDN"""
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <link type="text/css" rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css">
+        <link rel="shortcut icon" href="https://fastapi.tiangolo.com/img/favicon.png">
+        <title>{settings.app_name} - Swagger UI</title>
+        </head>
+        <body>
+        <div id="swagger-ui">
+        </div>
+        <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
+        <script>
+        const ui = SwaggerUIBundle({{
+            url: '/openapi.json',
+            dom_id: "#swagger-ui",
+            layout: "BaseLayout",
+            deepLinking: true,
+            showExtensions: true,
+            persistAuthorization: true,
+        }});
+        </script>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content)
+
+
+# 添加限流中间件（需要在路由注册前）
+@app.on_event("startup")
+async def add_rate_limit_middleware():
+    """添加限流中间件"""
+    from api.middleware.rate_limit import RateLimitMiddleware
+    
+    if hasattr(app.state, "redis_client"):
+        app.add_middleware(RateLimitMiddleware, redis_client=app.state.redis_client)
+        print("✓ 限流中间件已添加")
+
+
 # 注册路由
+from utils.prometheus import router as prometheus_router
+
+app.include_router(prometheus_router)  # Prometheus metrics
+app.include_router(health.router, prefix=settings.api_v1_prefix)
 app.include_router(admin.router, prefix=settings.api_v1_prefix)
+app.include_router(auth.router, prefix=settings.api_v1_prefix)
 app.include_router(tenant.router, prefix=settings.api_v1_prefix)
 app.include_router(conversation.router, prefix=settings.api_v1_prefix)
 app.include_router(knowledge.router, prefix=settings.api_v1_prefix)
@@ -131,6 +255,13 @@ app.include_router(ai_chat.router, prefix=settings.api_v1_prefix)
 app.include_router(websocket.router, prefix=settings.api_v1_prefix)
 app.include_router(intent.router, prefix=settings.api_v1_prefix)
 app.include_router(rag.router, prefix=settings.api_v1_prefix)
+app.include_router(monitor.router, prefix=settings.api_v1_prefix)
+app.include_router(quality.router, prefix=settings.api_v1_prefix)
+app.include_router(webhook.router, prefix=settings.api_v1_prefix)
+app.include_router(model_config.router, prefix=settings.api_v1_prefix)
+app.include_router(statistics.router, prefix=settings.api_v1_prefix)
+app.include_router(analytics.router, prefix=settings.api_v1_prefix)
+app.include_router(sensitive_word.router, prefix=settings.api_v1_prefix)
 
 
 if __name__ == "__main__":

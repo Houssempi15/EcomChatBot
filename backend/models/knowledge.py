@@ -1,12 +1,29 @@
 """
 知识库相关模型
 """
+import json
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, Index, Integer, String, Text
+from sqlalchemy import DateTime, Float, Index, Integer, String, Text, TypeDecorator
 from sqlalchemy.orm import Mapped, mapped_column
 
 from models.base import TenantBaseModel
+
+
+class JSONEncodedList(TypeDecorator):
+    """跨数据库兼容的 JSON List 类型，自动序列化/反序列化"""
+    impl = Text
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None:
+            return json.dumps(value, ensure_ascii=False)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is not None:
+            return json.loads(value)
+        return value
 
 
 class KnowledgeBase(TenantBaseModel):
@@ -36,7 +53,7 @@ class KnowledgeBase(TenantBaseModel):
 
     # 分类和标签
     category: Mapped[str | None] = mapped_column(String(128), comment="分类")
-    tags: Mapped[list | None] = mapped_column(Text, comment="标签(JSON数组)")
+    tags: Mapped[list | None] = mapped_column(JSONEncodedList, comment="标签(JSON数组)")
 
     # 来源
     source: Mapped[str | None] = mapped_column(String(256), comment="来源")

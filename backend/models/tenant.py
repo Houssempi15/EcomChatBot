@@ -33,10 +33,24 @@ class Tenant(BaseModel):
     contact_phone: Mapped[str | None] = mapped_column(String(20), comment="联系电话")
 
     # 认证信息
+    password_hash: Mapped[str] = mapped_column(
+        String(255), nullable=False, comment="密码哈希(用于登录)"
+    )
     api_key_hash: Mapped[str] = mapped_column(
         String(255), nullable=False, comment="API密钥(加密存储)"
     )
     api_key_salt: Mapped[str | None] = mapped_column(String(64), comment="API密钥盐值")
+
+    # 密码认证信息
+    login_attempts: Mapped[int] = mapped_column(Integer, default=0, comment="登录失败次数")
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime, comment="锁定截止时间")
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime, comment="最后登录时间")
+    last_login_ip: Mapped[str | None] = mapped_column(String(64), comment="最后登录IP")
+
+    # Refresh Token
+    refresh_token_hash: Mapped[str | None] = mapped_column(
+        String(255), comment="刷新Token哈希"
+    )
 
     # 状态信息
     status: Mapped[str] = mapped_column(

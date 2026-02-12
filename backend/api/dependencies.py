@@ -15,9 +15,10 @@ from core import (
     decode_token,
     has_permission,
 )
-from db import get_db
+from db import get_db, get_redis
 from models import Admin
 from services import AdminService, TenantService
+from services.quota_service import QuotaService
 
 # HTTP Bearer Token
 security = HTTPBearer()
@@ -29,6 +30,8 @@ async def get_current_tenant_from_api_key(
 ) -> str:
     """
     从 API Key 获取租户 ID（用于租户API认证）
+
+    使用 Redis 缓存以提高性能，缓存时间 5 分钟
     """
     if not x_api_key:
         raise HTTPException(
@@ -37,6 +40,20 @@ async def get_current_tenant_from_api_key(
             headers={"WWW-Authenticate": "ApiKey"},
         )
 
+    # 尝试从 Redis 缓存获取
+    from db import get_cache
+
+    cache = await get_cache()
+    cache_key = f"api_key:{x_api_key}"
+    cached_tenant_id = await cache.get(cache_key)
+
+    if cached_tenant_id:
+        # 验证租户访问权限
+        tenant_service = TenantService(db)
+        await tenant_service.check_tenant_access(cached_tenant_id)
+        return cached_tenant_id
+
+    # 缓存未命中，从数据库查询
     tenant_service = TenantService(db)
     tenant = await tenant_service.get_tenant_by_api_key(x_api_key)
 
@@ -45,6 +62,9 @@ async def get_current_tenant_from_api_key(
 
     # 检查租户访问权限
     await tenant_service.check_tenant_access(tenant.tenant_id)
+
+    # 缓存结果，5分钟过期
+    await cache.set(cache_key, tenant.tenant_id, expire=300)
 
     return tenant.tenant_id
 
@@ -114,6 +134,9 @@ async def get_current_admin(
 def require_admin_permission(permission: str):
     """
     权限检查装饰器（用于管理员API）
+
+    使用示例:
+        @router.post("/path", dependencies=[Depends(require_admin_permission(Permission.TENANT_CREATE))])
     """
 
     async def permission_checker(
@@ -127,8 +150,44 @@ def require_admin_permission(permission: str):
     return permission_checker
 
 
+def require_role(*allowed_roles: AdminRole):
+    """
+    角色检查装饰器（用于管理员API）
+
+    Args:
+        allowed_roles: 允许的角色列表
+
+    使用示例:
+        @router.post("/path", dependencies=[Depends(require_role(AdminRole.SUPER_ADMIN))])
+    """
+
+    async def role_checker(
+        admin: Annotated[Admin, Depends(get_current_admin)]
+    ) -> Admin:
+        role = AdminRole(admin.role)
+        if role not in allowed_roles:
+            roles_str = ", ".join([r.value for r in allowed_roles])
+            raise InsufficientPermissionException(
+                f"需要角色: {roles_str}，当前角色: {role.value}"
+            )
+        return admin
+
+    return role_checker
+
+
+async def get_quota_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> QuotaService:
+    """
+    获取配额服务实例(带Redis支持)
+    """
+    redis = await get_redis()
+    return QuotaService(db, redis)
+
+
 # 常用依赖注入类型定义
 TenantDep = Annotated[str, Depends(get_current_tenant_from_api_key)]
 TenantTokenDep = Annotated[str, Depends(get_current_tenant_from_token)]
 AdminDep = Annotated[Admin, Depends(get_current_admin)]
 DBDep = Annotated[AsyncSession, Depends(get_db)]
+QuotaServiceDep = Annotated[QuotaService, Depends(get_quota_service)]

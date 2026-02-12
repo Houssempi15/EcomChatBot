@@ -29,7 +29,10 @@ class KnowledgeService:
         priority: int = 0,
     ) -> KnowledgeBase:
         """创建知识条目"""
-        knowledge_id = f"kb_{self.tenant_id}_{int(datetime.utcnow().timestamp())}"
+        import uuid
+        timestamp = int(datetime.utcnow().timestamp())
+        random_suffix = uuid.uuid4().hex[:8]
+        knowledge_id = f"kb_{self.tenant_id}_{timestamp}_{random_suffix}"
 
         knowledge = KnowledgeBase(
             tenant_id=self.tenant_id,
@@ -225,13 +228,13 @@ class KnowledgeService:
         self,
         knowledge_items: list[dict],
     ) -> dict:
-        """批量导入知识"""
+        """批量导入知识，返回 {created: [{knowledge_id, ...}], failed: [...]}"""
         results = {"success": [], "failed": []}
 
         for item in knowledge_items:
             try:
                 knowledge = await self.create_knowledge(
-                    knowledge_type=item["knowledge_type"],
+                    knowledge_type=item.get("knowledge_type", "faq"),
                     title=item["title"],
                     content=item["content"],
                     category=item.get("category"),
@@ -239,7 +242,7 @@ class KnowledgeService:
                     source=item.get("source"),
                     priority=item.get("priority", 0),
                 )
-                results["success"].append(knowledge.knowledge_id)
+                results["success"].append(knowledge)
             except Exception as e:
                 results["failed"].append({"item": item, "error": str(e)})
 

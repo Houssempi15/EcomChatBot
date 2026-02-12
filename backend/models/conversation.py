@@ -97,12 +97,32 @@ class Conversation(TenantBaseModel):
     )
     feedback: Mapped[str | None] = mapped_column(Text, comment="用户反馈")
 
+    # 解决率相关字段
+    resolved: Mapped[bool] = mapped_column(
+        Integer, default=False, comment="是否解决问题"
+    )
+    resolution_type: Mapped[str | None] = mapped_column(
+        String(20), comment="解决方式(ai/human/timeout/abandoned)"
+    )
+    transferred_to_human: Mapped[bool] = mapped_column(
+        Integer, default=False, comment="是否转人工"
+    )
+    transfer_reason: Mapped[str | None] = mapped_column(
+        String(255), comment="转人工原因"
+    )
+    resolution_time: Mapped[int | None] = mapped_column(
+        Integer, comment="解决时长(秒)"
+    )
+
     # 用量统计
     message_count: Mapped[int] = mapped_column(Integer, default=0, comment="消息数")
     token_usage: Mapped[int] = mapped_column(Integer, default=0, comment="Token消耗")
 
     # 会话上下文（用于恢复）
     context: Mapped[dict | None] = mapped_column(Text, comment="会话上下文(JSON格式)")
+
+    # 对话摘要（长对话自动压缩）
+    summary: Mapped[str | None] = mapped_column(Text, comment="对话摘要")
 
     # 标签
     tags: Mapped[list | None] = mapped_column(Text, comment="标签(JSON数组)")

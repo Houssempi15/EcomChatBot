@@ -2,9 +2,11 @@
 数据库模型
 """
 from models.admin import Admin, AdminOperationLog, PermissionTemplate
+from models.audit_log import AuditLog, AuditEventType, AuditSeverity
 from models.base import BaseModel, TenantBaseModel
 from models.conversation import Conversation, Message, User
 from models.knowledge import KnowledgeBase, KnowledgeUsageLog
+from models.model_config import ModelConfig, LLMProvider
 from models.payment import (
     OrderStatus,
     PaymentChannel,
@@ -16,7 +18,11 @@ from models.payment import (
     TransactionStatus,
     TransactionType,
 )
+from models.quota import QuotaAdjustmentLog
+from models.invoice import Invoice, InvoiceTitle, InvoiceType, InvoiceStatus
 from models.tenant import Bill, Subscription, Tenant, UsageRecord
+from models.webhook import WebhookConfig, WebhookLog, WebhookEventType
+from models.notification import InAppNotification, NotificationPreference
 
 __all__ = [
     # Base
@@ -26,6 +32,10 @@ __all__ = [
     "Admin",
     "AdminOperationLog",
     "PermissionTemplate",
+    # Audit
+    "AuditLog",
+    "AuditEventType",
+    "AuditSeverity",
     # Tenant
     "Tenant",
     "Subscription",
@@ -38,6 +48,9 @@ __all__ = [
     # Knowledge
     "KnowledgeBase",
     "KnowledgeUsageLog",
+    # Model Config
+    "ModelConfig",
+    "LLMProvider",
     # Payment
     "PaymentOrder",
     "PaymentTransaction",
@@ -48,4 +61,13 @@ __all__ = [
     "SubscriptionType",
     "TransactionType",
     "TransactionStatus",
+    # Webhook
+    "WebhookConfig",
+    "WebhookLog",
+    "WebhookEventType",
+    # Quota
+    "QuotaAdjustmentLog",
+    # Notification
+    "InAppNotification",
+    "NotificationPreference",
 ]
