@@ -46,8 +46,12 @@ pipeline {
     // ============================================
     // 触发器配置
     // ============================================
+    // 注意: 需要安装 Generic Webhook Trigger 插件才能使用Webhook自动触发
+    // 如果未安装插件，可以注释掉整个 triggers 块，使用手动触发
     triggers {
         // Webhook触发 - 需要安装 Generic Webhook Trigger 插件
+        // 临时禁用: 如果插件未安装，请注释下面的 GenericTrigger 配置
+        /* 
         GenericTrigger(
             genericVariables: [
                 [key: 'ref', value: '$.ref'],
@@ -57,6 +61,14 @@ pipeline {
             token: 'ecom-chatbot-deploy-token',
             regexpFilterText: '$ref',
             regexpFilterExpression: 'refs/heads/develop'
+        )
+        */
+        
+        // 替代方案: 使用Gitee触发器（如果您使用Gitee）
+        gitee(
+            triggerOnPush: true,
+            branchFilter: 'develop',
+            noteRegex: ''
         )
     }
     
