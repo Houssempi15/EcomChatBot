@@ -262,10 +262,21 @@ pipeline {
                         echo "执行测试套件"
                         echo "=========================================="
                         
+                        # 等待API服务启动
+                        echo "等待API服务就绪..."
+                        for i in {1..30}; do
+                            if docker-compose -f docker-compose.jenkins-test.yml exec -T test-api curl -f http://localhost:8000/docs > /dev/null 2>&1; then
+                                echo "✓ API服务已就绪"
+                                break
+                            fi
+                            echo "等待中...\$i/30"
+                            sleep 2
+                        done
+                        
                         # 运行测试
                         docker-compose -f docker-compose.jenkins-test.yml exec -T test-api bash -c "
-                            cd /app
-                            pytest tests/ \\
+                            cd /app/tests
+                            BASE_URL=http://test-api:8000 pytest . \\
                                 --junitxml=reports/junit.xml \\
                                 --html=reports/html/report.html \\
                                 --self-contained-html \\
