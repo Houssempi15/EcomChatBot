@@ -85,16 +85,19 @@ pipeline {
     // ============================================
     stages {
         // ----------------------------------------
-        // 阶段0: 清理权限问题文件
+        // 阶段0: 预清理
         // ----------------------------------------
         stage('预清理') {
             steps {
                 script {
                     sh '''
-                        # 清理可能存在的权限问题文件
-                        sudo rm -rf backend/reports backend/tests/__pycache__ backend/tests/.pytest_cache || true
-                        # 清理docker-compose测试环境
+                        # 清理Docker测试环境
                         docker-compose -f docker-compose.jenkins-test.yml down -v || true
+                        
+                        # 清理测试生成的文件（跳过权限错误）
+                        find backend/tests -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+                        find backend/tests -type d -name .pytest_cache -exec rm -rf {} + 2>/dev/null || true
+                        rm -rf backend/reports 2>/dev/null || true
                     '''
                 }
             }
@@ -118,14 +121,24 @@ pipeline {
                     echo ""
                 }
                 
-                // 检出develop分支代码
+                // 清理workspace中的Python缓存文件（避免权限问题）
+                sh '''
+                    echo "清理workspace中的缓存文件..."
+                    # 尝试修改权限后删除
+                    find . -type d -name "__pycache__" -exec sudo chmod -R 777 {} + 2>/dev/null || true
+                    find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+                    find . -type f -name "*.pyc" -exec sudo chmod 666 {} + 2>/dev/null || true
+                    find . -type f -name "*.pyc" -delete 2>/dev/null || true
+                    echo "清理完成"
+                '''
+                
+                // 检出develop分支代码（移除WipeWorkspace以避免权限冲突）
                 checkout([
                     $class: 'GitSCM',
                     branches: [[name: '*/develop']],
                     userRemoteConfigs: [[url: env.GIT_URL]],
                     extensions: [
-                        [$class: 'CleanCheckout'],
-                        [$class: 'WipeWorkspace']
+                        [$class: 'CleanCheckout']
                     ]
                 ])
                 
@@ -531,18 +544,23 @@ pipeline {
     // ============================================
     post {
         always {
-            script {
-                echo "🧹 清理构建环境..."
-                sh '''
-                    # 清理Python缓存
-                    find backend/tests -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-                    find backend/tests -type f -name "*.pyc" -delete 2>/dev/null || true
-                    
-                    # 清理测试镜像
-                    docker rmi ${TEST_IMAGE}:${BUILD_NUMBER} 2>/dev/null || true
-                    
-                    echo "✓ 清理完成"
-                '''
+            // 需要在node内执行，确保有workspace上下文
+            node {
+                script {
+                    echo "🧹 清理构建环境..."
+                    sh '''
+                        # 清理Python缓存（使用sudo修改权限）
+                        find backend/tests -type d -name "__pycache__" -exec sudo chmod -R 777 {} + 2>/dev/null || true
+                        find backend/tests -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+                        find backend/tests -type f -name "*.pyc" -exec sudo chmod 666 {} + 2>/dev/null || true
+                        find backend/tests -type f -name "*.pyc" -delete 2>/dev/null || true
+                        
+                        # 清理测试镜像
+                        docker rmi ${TEST_IMAGE}:${BUILD_NUMBER} 2>/dev/null || true
+                        
+                        echo "✓ 清理完成"
+                    '''
+                }
             }
         }
         
@@ -573,14 +591,19 @@ pipeline {
         
         failure {
             script {
+                def projectName = env.PROJECT_NAME ?: 'ecom-chat-bot'
+                def buildNumber = env.BUILD_NUMBER ?: 'N/A'
+                def commitShort = env.GIT_COMMIT_SHORT ?: 'N/A'
+                
                 echo """
 ╔════════════════════════════════════════════════════════╗
 ║               ❌ 部署失败！                             ║
 ╚════════════════════════════════════════════════════════╝
 
-📋 项目: ${PROJECT_NAME}
-🔢 构建: #${env.BUILD_NUMBER}
+📋 项目: ${projectName}
+🔢 构建: #${buildNumber}
 🌿 分支: develop
+🏷️  提交: ${commitShort}
 
 请查看构建日志了解失败原因:
 ${env.BUILD_URL}console
