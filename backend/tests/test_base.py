@@ -147,6 +147,8 @@ class ModelConfigTestMixin:
                 api_key = settings.zhipuai_api_key
             elif provider == "openai":
                 api_key = settings.openai_api_key
+            elif provider == "deepseek":
+                api_key = settings.deepseek_api_key
 
         config_data = self.data_gen.generate_model_config(provider, api_key)
 

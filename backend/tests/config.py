@@ -16,7 +16,7 @@ class TestSettings(BaseSettings):
     )
 
     # ============ 基础配置 ============
-    base_url: str = "http://115.190.75.88:8000"
+    base_url: str = "http://127.0.0.1:8000"
     api_prefix: str = "/api/v1"
 
     # ============ 超时设置 ============
