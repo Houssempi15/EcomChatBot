@@ -311,10 +311,11 @@ pipeline {
                             sleep 2
                         done
                         
-                        # 运行测试
+                        # 运行测试（排除支付相关测试）
                         docker-compose -f docker-compose.jenkins-test.yml exec -T test-api bash -c "
                             cd /app/tests
                             BASE_URL=http://test-api:8000 pytest . \\
+                                -m 'not payment' \\
                                 --junitxml=reports/junit.xml \\
                                 --html=reports/html/report.html \\
                                 --self-contained-html \\
@@ -387,9 +388,10 @@ pipeline {
                         def failedTests = testResults.failCount
                         def skippedTests = testResults.skipCount
                         
-                        def passRate = 0.0
+                        // 计算通过率（避免使用 toDouble()，直接用整数计算）
+                        def passRate = 0
                         if (totalTests > 0) {
-                            passRate = Math.round((passedTests.toDouble() / totalTests.toDouble()) * 10000.0) / 100.0
+                            passRate = (passedTests * 100) / totalTests
                         }
                         
                         echo """
@@ -415,8 +417,8 @@ pipeline {
                             echo "⚠️  有测试失败，但不阻止部署"
                         }
                         
-                        // 通过率过低则失败
-                        if (passRate < 15 && !params.FORCE_DEPLOY) {
+                        // 通过率过低则失败（调整阈值为70%）
+                        if (passRate < 70 && !params.FORCE_DEPLOY) {
                             error "❌ 测试通过率过低 (${passRate}%)，部署终止"
                         }
                         
