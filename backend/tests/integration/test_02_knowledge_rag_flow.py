@@ -15,6 +15,7 @@ from config import settings
 
 
 @pytest.mark.integration
+@pytest.mark.rag  # 需要Milvus支持
 class TestKnowledgeRAGFlow(
     BaseAPITest,
     TenantTestMixin,

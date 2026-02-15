@@ -332,11 +332,11 @@ pipeline {
                             sleep 2
                         done
                         
-                        # 运行测试（排除支付相关测试）
+                        # 运行测试（排除支付和RAG相关测试，因为Milvus未启用）
                         docker-compose -f docker-compose.jenkins-test.yml exec -T test-api bash -c "
                             cd /app/tests
                             BASE_URL=http://test-api:8000 pytest . \\
-                                -m 'not payment' \\
+                                -m 'not payment and not rag' \\
                                 --junitxml=reports/junit.xml \\
                                 --html=reports/html/report.html \\
                                 --self-contained-html \\
