@@ -300,6 +300,21 @@ pipeline {
                         "
                     """
                     
+                    // 初始化管理员账号
+                    sh """
+                        echo "=========================================="
+                        echo "初始化管理员账号"
+                        echo "=========================================="
+                        
+                        docker-compose -f docker-compose.jenkins-test.yml exec -T test-api bash -c "
+                            cd /app
+                            python tests/scripts/init_admin.py
+                        "
+                        
+                        echo "✓ 管理员账号初始化完成"
+                        echo "=========================================="
+                    """
+                    
                     // 运行测试
                     sh """
                         echo "=========================================="
