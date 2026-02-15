@@ -10,26 +10,26 @@ services:
     container_name: ecom-chatbot-api
     restart: unless-stopped
     environment:
-      # 数据库连接
-      DATABASE_URL: postgresql+asyncpg://ecom_user:ecom_password@postgres:5432/ecom_chatbot
-      POSTGRES_HOST: postgres
+      # 数据库连接（使用外部服务）
+      DATABASE_URL: postgresql+asyncpg://ecom_user:ecom_password@localhost:5432/ecom_chatbot
+      POSTGRES_HOST: localhost
       POSTGRES_USER: ecom_user
       POSTGRES_PASSWORD: ecom_password
       POSTGRES_DB: ecom_chatbot
       
-      # Redis
-      REDIS_URL: redis://redis:6379/0
+      # Redis（使用外部服务）
+      REDIS_URL: redis://localhost:6379/0
       
-      # Milvus
-      MILVUS_HOST: milvus
+      # Milvus（使用外部服务）
+      MILVUS_HOST: localhost
       MILVUS_PORT: 19530
       
-      # RabbitMQ
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      # RabbitMQ（使用外部服务）
+      RABBITMQ_URL: amqp://guest:guest@localhost:5672/
       
       # Celery
-      CELERY_BROKER_URL: redis://redis:6379/1
-      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      CELERY_BROKER_URL: redis://localhost:6379/1
+      CELERY_RESULT_BACKEND: redis://localhost:6379/2
       
       # 不运行初始化（生产环境已初始化）
       RUN_INIT_DB: "false"
@@ -38,13 +38,8 @@ services:
       - /opt/ecom-chat-bot/shared/.env.production
     ports:
       - "8000:8000"
-    networks:
-      - ecom-network
-    depends_on:
-      - postgres
-      - redis
-      - milvus
-      - rabbitmq
+    network_mode: host
+    # 移除 depends_on，假设基础服务已在宿主机运行
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -61,11 +56,11 @@ services:
     restart: unless-stopped
     command: celery -A tasks.celery_app worker --loglevel=info
     environment:
-      DATABASE_URL: postgresql+asyncpg://ecom_user:ecom_password@postgres:5432/ecom_chatbot
-      REDIS_URL: redis://redis:6379/0
-      CELERY_BROKER_URL: redis://redis:6379/1
-      CELERY_RESULT_BACKEND: redis://redis:6379/2
-      POSTGRES_HOST: postgres
+      DATABASE_URL: postgresql+asyncpg://ecom_user:ecom_password@localhost:5432/ecom_chatbot
+      REDIS_URL: redis://localhost:6379/0
+      CELERY_BROKER_URL: redis://localhost:6379/1
+      CELERY_RESULT_BACKEND: redis://localhost:6379/2
+      POSTGRES_HOST: localhost
       POSTGRES_USER: ecom_user
       POSTGRES_PASSWORD: ecom_password
       POSTGRES_DB: ecom_chatbot
@@ -73,19 +68,13 @@ services:
       RUN_MIGRATIONS: "false"
     env_file:
       - /opt/ecom-chat-bot/shared/.env.production
-    networks:
-      - ecom-network
-    depends_on:
-      - redis
-      - postgres
+    network_mode: host
+    # 移除 depends_on，假设基础服务已在宿主机运行
     volumes:
       - /opt/ecom-chat-bot/shared/logs:/app/logs
 
-networks:
-  ecom-network:
-    external: true
-
+# 移除 networks 配置，使用 host 网络模式
 # 注意：
-# 1. 基础服务(postgres, redis, milvus, rabbitmq)由主 docker-compose.yml 管理
-# 2. 本配置仅管理应用服务(api, celery-worker)
+# 1. 基础服务(postgres, redis, milvus, rabbitmq)应在宿主机上运行
+# 2. 本配置使用 host 网络模式，直接访问宿主机服务
 # 3. BUILD_NUMBER 由 Jenkins 传入，用于版本标记
