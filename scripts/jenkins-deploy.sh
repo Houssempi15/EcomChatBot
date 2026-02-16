@@ -109,21 +109,8 @@ log "步骤 3/6: 启动新版本容器"
 
 cd "$DEPLOY_DIR" || error "无法进入部署目录"
 
-# 检查基础服务
-info "检查基础服务状态..."
-REQUIRED_SERVICES=("postgres" "redis" "milvus" "rabbitmq")
-for service in "${REQUIRED_SERVICES[@]}"; do
-    if ! docker ps --format '{{.Names}}' | grep -q "ecom-chatbot-${service}"; then
-        warn "基础服务未运行: ${service}"
-        info "尝试启动基础服务..."
-        cd /Users/zhulang/work/ecom-chat-bot
-        $DOCKER_COMPOSE up -d "$service"
-        sleep 5
-        cd "$DEPLOY_DIR"
-    fi
-done
-
-# 使用新镜像启动容器（临时名称）
+# 使用新镜像启动容器
+# 注意：假设基础服务(postgres, redis, milvus, rabbitmq)已在宿主机运行
 info "启动新版本容器..."
 BUILD_NUMBER=$IMAGE_TAG $DOCKER_COMPOSE -f "$COMPOSE_FILE" -p ecom-prod up -d
 
