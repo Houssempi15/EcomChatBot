@@ -57,26 +57,10 @@ async def prepare_test_environment():
     print("🔧 准备测试环境...")
     print("="*60)
     
-    # 注意：管理员账号初始化已在 Jenkinsfile 中的 init_admin.py 脚本执行
-    # 这里不再重复初始化，避免导入路径问题
     print(f"✅ 使用管理员账号: {settings.admin_username}")
     print(f"✅ API 基础URL: {settings.base_url}")
     print(f"✅ LLM 提供商: {settings.llm_provider}")
     
-    yield
-    
-    # 测试完成后清理
-    print("\n" + "="*60)
-    print("🧹 清理测试数据...")
-    print("="*60)
-    
-    if settings.cleanup_after_test:
-        await cleaner.cleanup_all()
-        print("✅ 测试数据清理完成")
-    else:
-        print("⚠️  跳过清理（CLEANUP_AFTER_TEST=false）")
-    
-    # 2. 检查 LLM 配置
     if settings.has_llm_config:
         print(f"✅ LLM 已配置: {settings.llm_provider}")
     else:
@@ -89,6 +73,10 @@ async def prepare_test_environment():
     print("="*60 + "\n")
     
     yield
+    
+    print("\n" + "="*60)
+    print("🏁 所有测试执行完毕")
+    print("="*60)
 
 
 @pytest.fixture(scope="session", autouse=True)
