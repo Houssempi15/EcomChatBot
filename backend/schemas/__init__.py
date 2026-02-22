@@ -85,6 +85,10 @@ from schemas.webhook import (
     WebhookResponse,
     WebhookLogResponse,
 )
+from schemas.setup import (
+    SetupStatus,
+    InitialAdminCreate,
+)
 
 __all__ = [
     # Base
@@ -168,4 +172,7 @@ __all__ = [
     "SubscriptionDetail",
     "ProratedPriceDetail",
     "SubscriptionOperationResponse",
+    # Setup
+    "SetupStatus",
+    "InitialAdminCreate",
 ]
