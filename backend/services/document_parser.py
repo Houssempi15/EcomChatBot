@@ -26,9 +26,8 @@ async def parse_and_split(filename: str, file_bytes: bytes) -> tuple[str, int]:
         elif ext == "pdf":
             loader = PyPDFLoader(tmp_path)
         elif ext in ("md", "markdown"):
-            # 延迟导入，避免未安装 unstructured 时报错
-            from langchain_community.document_loaders import UnstructuredMarkdownLoader
-            loader = UnstructuredMarkdownLoader(tmp_path)
+            from langchain_community.document_loaders import TextLoader
+            loader = TextLoader(tmp_path, encoding="utf-8", autodetect_encoding=True)
         else:
             # txt / csv / json / xml / html 等纯文本
             from langchain_community.document_loaders import TextLoader

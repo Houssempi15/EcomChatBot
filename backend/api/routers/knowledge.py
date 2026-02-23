@@ -20,7 +20,7 @@ from schemas import (
     RAGQueryRequest,
     RAGQueryResponse,
 )
-from schemas.knowledge import KnowledgeSearchRequest
+from schemas.knowledge import KnowledgeSearchRequest, KnowledgeStatsResponse
 from services.document_parser import parse_and_split
 from services.knowledge_service import KnowledgeService
 from services.rag_service import RAGService
@@ -170,15 +170,23 @@ async def upload_document(
         category=category,
         tags=tag_list,
         source="upload",
+        chunk_count=chunk_count,
     )
-    item.chunk_count = chunk_count
-    await db.commit()
-    await db.refresh(item)
 
     return ApiResponse(data=KnowledgeBaseResponse.model_validate(item))
 
 
 # ============ 知识库设置 - 固定路径必须在 /{knowledge_id} 之前 ============
+
+@router.get("/stats", response_model=ApiResponse[KnowledgeStatsResponse])
+async def get_knowledge_stats(tenant_id: TenantFlexDep, db: DBDep):
+    """获取知识库统计数据（总文档数、总切片数）"""
+    svc = KnowledgeService(db, tenant_id)
+    total_docs, total_chunks = await svc.get_stats()
+    return ApiResponse(data=KnowledgeStatsResponse(
+        total_documents=total_docs,
+        total_chunks=total_chunks,
+    ))
 
 @router.get("/settings", response_model=ApiResponse[KnowledgeSettingsResponse])
 async def get_knowledge_settings(tenant_id: TenantFlexDep, db: DBDep):

@@ -3,9 +3,72 @@ Embedding 服务 - 文本向量化
 """
 from typing import Any
 
+import httpx
 from langchain_openai import OpenAIEmbeddings
 
 from core.config import settings
+
+
+class _ZhipuAIEmbeddings:
+    """直接调用 ZhipuAI embedding API，绕过 LangChain 的 tiktoken 分词（ZhipuAI 只接受字符串）"""
+
+    def __init__(self, api_key: str, model: str):
+        self.api_key = api_key
+        self.model = model
+        self._base_url = "https://open.bigmodel.cn/api/paas/v4/embeddings"
+
+    async def aembed_query(self, text: str) -> list[float]:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                self._base_url,
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                json={"model": self.model, "input": text},
+            )
+            resp.raise_for_status()
+            return resp.json()["data"][0]["embedding"]
+
+    async def aembed_documents(self, texts: list[str]) -> list[list[float]]:
+        results = []
+        for text in texts:
+            results.append(await self.aembed_query(text))
+        return results
+
+
+class _QwenEmbeddings:
+    """直接调用 DashScope 原生 embedding API（text-embedding-v2 不支持 OpenAI 兼容格式）"""
+
+    def __init__(self, api_key: str, model: str):
+        self.api_key = api_key
+        self.model = model
+        self._base_url = (
+            "https://dashscope.aliyuncs.com/api/v1/services/embeddings/"
+            "text-embedding/text-embedding"
+        )
+
+    async def aembed_query(self, text: str) -> list[float]:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                self._base_url,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.model,
+                    "input": {"texts": [text]},
+                    "parameters": {"text_type": "query"},
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data["output"]["embeddings"][0]["embedding"]
+
+    async def aembed_documents(self, texts: list[str]) -> list[list[float]]:
+        # DashScope 支持批量请求，但为简单起见逐条处理
+        results = []
+        for text in texts:
+            results.append(await self.aembed_query(text))
+        return results
 
 # 常见嵌入模型的向量维度
 EMBEDDING_DIMENSIONS: dict[str, int] = {
@@ -21,8 +84,12 @@ EMBEDDING_DIMENSIONS: dict[str, int] = {
     "embed-english-v3.0": 1024,      # Cohere
 }
 
-# 支持 OpenAI 兼容接口的 provider
-OPENAI_COMPATIBLE = {"openai", "azure_openai", "deepseek", "moonshot", "qwen", "zhipuai"}
+# 支持 OpenAI 兼容接口的 provider（ZhipuAI / Qwen 单独处理，不走 LangChain OpenAIEmbeddings）
+OPENAI_COMPATIBLE = {"openai", "azure_openai", "deepseek", "moonshot"}
+
+# Qwen text-embedding-v3 及以上版本支持兼容模式；v2 及以下需原生 API
+# 这里列出支持 OpenAI 兼容格式的 Qwen embedding 模型
+QWEN_OPENAI_COMPATIBLE_MODELS = {"text-embedding-v3"}
 
 # 各 provider 的默认 base URL
 PROVIDER_DEFAULT_BASE: dict[str, str] = {
@@ -48,7 +115,28 @@ class EmbeddingService:
         self.tenant_id = tenant_id
         self._model_config = model_config
 
-        if model_config and model_config.provider in OPENAI_COMPATIBLE:
+        if model_config and model_config.provider == "zhipuai":
+            # ZhipuAI 不兼容 LangChain 的 tiktoken 分词，直接用 httpx 调用
+            self.embeddings = _ZhipuAIEmbeddings(
+                api_key=model_config.api_key,
+                model=model_config.model_name,
+            )
+        elif model_config and model_config.provider == "qwen":
+            # Qwen: v3 支持 OpenAI 兼容格式，v2 及以下需要 DashScope 原生 API
+            if model_config.model_name in QWEN_OPENAI_COMPATIBLE_MODELS:
+                base = model_config.api_base or PROVIDER_DEFAULT_BASE["qwen"]
+                self.embeddings = OpenAIEmbeddings(
+                    model=model_config.model_name,
+                    openai_api_key=model_config.api_key,
+                    openai_api_base=base,
+                )
+            else:
+                # text-embedding-v2 等需要 DashScope 原生 API
+                self.embeddings = _QwenEmbeddings(
+                    api_key=model_config.api_key,
+                    model=model_config.model_name,
+                )
+        elif model_config and model_config.provider in OPENAI_COMPATIBLE:
             base = model_config.api_base or PROVIDER_DEFAULT_BASE.get(
                 model_config.provider, "https://api.openai.com/v1"
             )

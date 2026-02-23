@@ -19,6 +19,7 @@
 - ✅ **多 LLM 支持**：DeepSeek（默认）、OpenAI、智谱 AI、Anthropic
 - ✅ **RAG 检索增强**：Milvus 向量数据库 + 知识库问答
 - ✅ **意图识别**：规则 + LLM 混合意图识别与实体提取
+- ✅ **实时对话**：支持 WebSocket 全双工通信与流式响应
 - ✅ **订阅与支付**：支付宝、微信支付集成，支持套餐升降级与发票
 - ✅ **监控与质量评估**：对话统计、响应时间、满意度、质量自动评分
 - ✅ **Webhook 通知**：事件驱动的外部系统集成
@@ -38,6 +39,7 @@
 | LLM 提供商 | DeepSeek（默认）、OpenAI、智谱 AI、Anthropic |
 | 后台任务 | Celery 5.3 + Flower 监控界面 |
 | 消息队列 | RabbitMQ（任务分发）、Redis（Broker/Result） |
+| WebSocket | FastAPI WebSocket |
 
 ### 前端
 
@@ -169,11 +171,12 @@ ecom-chat-bot/
 │   │   ├── main.py            # 应用入口
 │   │   ├── dependencies.py    # 依赖注入（认证、DB）
 │   │   ├── middleware/        # 配额检查、限流、日志中间件
-│   │   └── routers/           # 路由模块（18 个）
+│   │   └── routers/           # 路由模块（20+ 个）
 │   │       ├── admin.py       # 平台管理
 │   │       ├── tenant.py      # 租户自服务
 │   │       ├── auth.py        # 认证
 │   │       ├── ai_chat.py     # AI 对话
+│   │       ├── websocket.py   # WebSocket 实时对话
 │   │       ├── conversation.py# 会话管理
 │   │       ├── knowledge.py   # 知识库
 │   │       ├── rag.py         # RAG 检索
@@ -195,7 +198,7 @@ ecom-chat-bot/
 │   │   └── exceptions.py      # 自定义异常（25+ 类型）
 │   ├── models/                # SQLAlchemy ORM 模型
 │   ├── schemas/               # Pydantic 请求/响应模型
-│   ├── services/              # 业务逻辑层（48+ 服务）
+│   ├── services/              # 业务逻辑层（50+ 服务）
 │   ├── tasks/                 # Celery 后台任务
 │   │   ├── celery_app.py
 │   │   ├── billing_tasks.py
@@ -245,7 +248,7 @@ ecom-chat-bot/
 |------|------|------|
 | Nginx | 80 | 反向代理（开发环境入口） |
 | Next.js 前端 | 3000 | 管理后台 Web UI |
-| FastAPI 后端 | 8000 | REST API |
+| FastAPI 后端 | 8000 | REST API & WebSocket |
 | PostgreSQL | 5432 | 主数据库 |
 | Redis | 6379 | 缓存 & Celery Broker |
 | Milvus | 19530 | 向量数据库 |
@@ -268,6 +271,7 @@ ecom-chat-bot/
 - 规则 + LLM 混合意图识别与实体提取
 - 上下文记忆管理，支持多轮对话摘要
 - RAG 检索增强：Milvus 向量检索 + 知识库重排序
+- WebSocket 实时流式响应
 
 ### 知识库管理
 
@@ -331,6 +335,7 @@ curl -X POST http://localhost:8000/api/v1/admin/login \
 | 租户 | `/api/v1/tenant` | 注册、订阅、配额、用量 |
 | 对话 | `/api/v1/conversation` | 会话 CRUD、消息管理 |
 | AI 对话 | `/api/v1/ai-chat` | 智能对话、意图分类、实体提取 |
+| WebSocket | `/api/v1/ws/chat` | 实时流式对话 |
 | 知识库 | `/api/v1/knowledge` | CRUD、搜索、批量导入 |
 | RAG | `/api/v1/rag` | 检索、生成、索引 |
 | 意图 | `/api/v1/intent` | 意图分类、实体提取 |

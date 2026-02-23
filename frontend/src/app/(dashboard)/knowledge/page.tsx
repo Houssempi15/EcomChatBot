@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Row, Col, Card, Button, Statistic, message, Typography, Spin, Form, Select, Alert } from 'antd';
 import { PlusOutlined, FileTextOutlined, AppstoreOutlined, CloudOutlined } from '@ant-design/icons';
 import {
@@ -53,6 +53,57 @@ export default function KnowledgePage() {
   const [modelConfigs, setModelConfigs] = useState<ModelConfig[]>([]);
   const [savingSettings, setSavingSettings] = useState(false);
 
+  // Load stats from dedicated endpoint
+  const loadStats = useCallback(async () => {
+    try {
+      const resp = await knowledgeApi.getStats();
+      if (resp.success && resp.data) {
+        setStats({
+          totalDocuments: resp.data.total_documents,
+          totalChunks: resp.data.total_chunks,
+          storageUsed: 0,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load stats:', err);
+    }
+  }, []);
+
+  // Polling ref
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
+
+  const startPolling = useCallback((pageSize: number) => {
+    stopPolling();
+    pollingRef.current = setInterval(async () => {
+      try {
+        const resp = await knowledgeApi.list({ page: 1, size: pageSize });
+        if (resp.success && resp.data) {
+          const items = resp.data.items || [];
+          setDocuments(items.map(transformToDocument));
+          const allDone = items.every(
+            (i) => i.embedding_status === 'completed' || i.embedding_status === 'failed'
+          );
+          if (allDone) {
+            stopPolling();
+          }
+          await loadStats();
+        }
+      } catch {
+        // 轮询失败静默处理，不中断轮询
+      }
+    }, 3000);
+  }, [stopPolling, loadStats]);
+
+  // Cleanup on unmount
+  useEffect(() => () => stopPolling(), [stopPolling]);
+
   // Load documents
   const loadDocuments = useCallback(async (page: number, pageSize: number, keyword: string) => {
     try {
@@ -70,14 +121,6 @@ export default function KnowledgePage() {
           ...prev,
           total: response.data?.total || 0,
         }));
-
-        // Calculate stats from loaded data
-        const totalChunks = items.reduce((sum, item) => sum + item.chunk_count, 0);
-        setStats({
-          totalDocuments: response.data.total || 0,
-          totalChunks,
-          storageUsed: 0, // Not provided by API
-        });
       }
     } catch (err) {
       console.error('Failed to load documents:', err);
@@ -107,8 +150,9 @@ export default function KnowledgePage() {
 
   useEffect(() => {
     loadDocuments(pagination.current, pagination.pageSize, searchValue);
+    loadStats();
     loadSettings();
-  }, [loadDocuments, loadSettings, pagination.current, pagination.pageSize, searchValue]);
+  }, [loadDocuments, loadStats, loadSettings, pagination.current, pagination.pageSize, searchValue]);
 
   const handleSaveSettings = async () => {
     if (!knowledgeSettings) return;
@@ -140,7 +184,9 @@ export default function KnowledgePage() {
       }
       message.success(`成功上传 ${files.length} 个文件`);
       setUploadModalOpen(false);
-      loadDocuments(pagination.current, pagination.pageSize, searchValue);
+      await loadDocuments(pagination.current, pagination.pageSize, searchValue);
+      await loadStats();
+      startPolling(pagination.pageSize);
     } catch (err) {
       console.error('Failed to upload:', err);
       message.error('上传失败');
@@ -269,7 +315,7 @@ export default function KnowledgePage() {
           <Alert
             className="mt-3"
             message="嵌入模型已锁定"
-            description="知识库已有向量化文档。若需更换嵌入模型，请先删除所有文档。"
+            description="知识库已有文档。若需更换嵌入模型，请先删除所有文档。"
             type="warning"
             showIcon
           />

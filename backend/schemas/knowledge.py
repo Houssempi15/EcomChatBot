@@ -120,3 +120,10 @@ class KnowledgeSettingsResponse(BaseSchema):
     embedding_model_id: int | None = None
     rerank_model_id: int | None = None
     has_indexed_documents: bool = False
+
+
+class KnowledgeStatsResponse(BaseSchema):
+    """知识库统计响应"""
+
+    total_documents: int
+    total_chunks: int
