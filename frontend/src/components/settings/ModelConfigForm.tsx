@@ -39,6 +39,7 @@ interface PlatformInfo {
   llm: string[];
   embedding: string[];
   rerank: string[];
+  supportedTypes: ModelType[]; // 静态声明支持的类型，用于卡片 tag
   needsApiBase?: boolean; // 是否支持自定义 API Base
 }
 
@@ -49,6 +50,7 @@ const PLATFORM_CATALOG: Record<string, PlatformInfo> = {
     llm: [],
     embedding: [],
     rerank: [],
+    supportedTypes: ['llm', 'embedding'],
     needsApiBase: true,
   },
   qwen: {
@@ -57,6 +59,7 @@ const PLATFORM_CATALOG: Record<string, PlatformInfo> = {
     llm: [],
     embedding: [],
     rerank: [],
+    supportedTypes: ['llm', 'embedding', 'rerank'],
     needsApiBase: true,
   },
   deepseek: {
@@ -65,6 +68,7 @@ const PLATFORM_CATALOG: Record<string, PlatformInfo> = {
     llm: [],
     embedding: [],
     rerank: [],
+    supportedTypes: ['llm'],
     needsApiBase: true,
   },
   zhipuai: {
@@ -73,6 +77,7 @@ const PLATFORM_CATALOG: Record<string, PlatformInfo> = {
     llm: [],
     embedding: [],
     rerank: [],
+    supportedTypes: ['llm', 'embedding'],
   },
   google: {
     name: 'Google Gemini',
@@ -80,6 +85,7 @@ const PLATFORM_CATALOG: Record<string, PlatformInfo> = {
     llm: [],
     embedding: [],
     rerank: [],
+    supportedTypes: ['llm', 'embedding'],
   },
   meta: {
     name: 'Meta (自定义)',
@@ -87,6 +93,7 @@ const PLATFORM_CATALOG: Record<string, PlatformInfo> = {
     llm: [],
     embedding: [],
     rerank: [],
+    supportedTypes: ['llm'],
     needsApiBase: true,
   },
   siliconflow: {
@@ -95,6 +102,7 @@ const PLATFORM_CATALOG: Record<string, PlatformInfo> = {
     llm: [],
     embedding: [],
     rerank: [],
+    supportedTypes: ['llm', 'embedding', 'rerank'],
     needsApiBase: true,
   },
   private: {
@@ -103,6 +111,7 @@ const PLATFORM_CATALOG: Record<string, PlatformInfo> = {
     llm: [],
     embedding: [],
     rerank: [],
+    supportedTypes: [],
     needsApiBase: true,
   },
 };
@@ -180,6 +189,15 @@ export default function ModelConfigForm() {
           }
         }
         setConfigs(merged);
+
+        // 从已保存配置重建 providerDiscoveredModels，使选择器在刷新后仍可显示
+        const discoveredFromSaved: Record<string, DiscoveredModel[]> = {};
+        for (const cfg of resp.data) {
+          const provider = cfg.provider;
+          if (!discoveredFromSaved[provider]) discoveredFromSaved[provider] = [];
+          discoveredFromSaved[provider].push({ name: cfg.model_name, model_type: cfg.model_type as 'llm' | 'embedding' | 'rerank' });
+        }
+        setProviderDiscoveredModels(prev => ({ ...prev, ...discoveredFromSaved }));
 
         // 自动展开第一个已有配置的平台（仅初始加载时）
         if (!silent) {
@@ -473,11 +491,7 @@ export default function ModelConfigForm() {
           {Object.entries(PLATFORM_CATALOG).map(([provider, info]) => {
             const isSelected = selectedProvider === provider;
             const hasConfig = !!configs[provider]?.api_key;
-            const discovered = providerDiscoveredModels[provider] || [];
-            const supportedTypes: ModelType[] = [];
-            if (discovered.some(m => m.model_type === 'llm')) supportedTypes.push('llm');
-            if (discovered.some(m => m.model_type === 'embedding')) supportedTypes.push('embedding');
-            if (discovered.some(m => m.model_type === 'rerank')) supportedTypes.push('rerank');
+            const supportedTypes = info.supportedTypes;
 
             return (
               <Col key={provider} xs={12} sm={8} md={6}>

@@ -423,6 +423,8 @@ class ModelConfigService:
 
     # 已知的 Qwen Rerank 模型白名单（可能不在 /models 列表中）
     _QWEN_KNOWN_RERANK_MODELS = ["qwen3-rerank", "gte-rerank-v2", "qwen3-vl-rerank"]
+    # 已知的 Qwen Embedding 模型白名单（DashScope /models 接口不返回嵌入模型）
+    _QWEN_KNOWN_EMBEDDING_MODELS = ["text-embedding-v4", "text-embedding-v3", "text-embedding-v2", "text-embedding-v1"]
 
     @staticmethod
     async def discover_models(
@@ -473,6 +475,11 @@ class ModelConfigService:
                     for rerank_name in ModelConfigService._QWEN_KNOWN_RERANK_MODELS:
                         if rerank_name not in seen_ids:
                             result.append({"name": rerank_name, "model_type": "rerank"})
+
+                    # 补充已知 embedding 白名单（/models 接口不返回嵌入模型）
+                    for emb_name in ModelConfigService._QWEN_KNOWN_EMBEDDING_MODELS:
+                        if emb_name not in seen_ids:
+                            result.append({"name": emb_name, "model_type": "embedding"})
 
                     return result
 
