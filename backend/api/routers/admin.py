@@ -543,7 +543,20 @@ async def assign_plan(
         new_plan=plan_type,
     )
 
-    return ApiResponse(data=subscription)
+    return ApiResponse(data={
+        "subscription_id": subscription.subscription_id,
+        "tenant_id": subscription.tenant_id,
+        "plan_type": subscription.plan_type,
+        "status": subscription.status,
+        "start_date": subscription.start_date.isoformat() if subscription.start_date else None,
+        "expire_at": subscription.expire_at.isoformat() if subscription.expire_at else None,
+        "auto_renew": subscription.auto_renew,
+        "is_trial": subscription.is_trial,
+        "conversation_quota": subscription.conversation_quota,
+        "api_quota": subscription.api_quota,
+        "storage_quota": subscription.storage_quota,
+        "concurrent_quota": subscription.concurrent_quota,
+    })
 
 
 @router.post(

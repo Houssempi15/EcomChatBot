@@ -33,7 +33,8 @@ export const adminSubscriptionsApi = {
   assignPlan: async (tenantId: string, data: AssignPlanParams): Promise<ApiResponse<SubscriptionInfo>> => {
     const response = await adminApiClient.post<ApiResponse<SubscriptionInfo>>(
       `/admin/tenants/${tenantId}/assign-plan`,
-      data
+      null,
+      { params: data }
     );
     return response.data;
   },
