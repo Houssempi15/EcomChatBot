@@ -190,10 +190,6 @@ class UsageRecord(BaseModel):
         Index("idx_usage_tenant_date", "tenant_id", "record_date"),
         {"comment": "用量记录表"},
     )
-
-    # 订阅唯一标识
-    subscription_id: Mapped[str] = mapped_column(
-        String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()), comment="订阅唯一标识(UUID)"
     )
 
     # 租户信息
