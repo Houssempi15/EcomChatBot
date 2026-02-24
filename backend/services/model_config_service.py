@@ -316,35 +316,13 @@ class ModelConfigService:
         timeout = httpx.Timeout(15.0)
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
-                if provider == "openai" or provider == "azure_openai":
+                if provider == "openai":
                     base = (api_base or "https://api.openai.com/v1").rstrip("/")
                     resp = await client.get(
                         f"{base}/models",
                         headers={"Authorization": f"Bearer {api_key}"},
                     )
                     if resp.status_code == 200:
-                        return {"valid": True, "message": "API Key 有效"}
-                    elif resp.status_code == 401:
-                        return {"valid": False, "message": "API Key 无效或已过期"}
-                    else:
-                        return {"valid": False, "message": f"验证失败（HTTP {resp.status_code}）"}
-
-                elif provider == "anthropic":
-                    resp = await client.post(
-                        "https://api.anthropic.com/v1/messages",
-                        headers={
-                            "x-api-key": api_key,
-                            "anthropic-version": "2023-06-01",
-                            "content-type": "application/json",
-                        },
-                        json={
-                            "model": "claude-3-haiku-20240307",
-                            "max_tokens": 1,
-                            "messages": [{"role": "user", "content": "hi"}],
-                        },
-                    )
-                    # 200 成功 / 400 bad_request 表示 key 有效但请求有误（此处不会出现）
-                    if resp.status_code in (200, 400):
                         return {"valid": True, "message": "API Key 有效"}
                     elif resp.status_code == 401:
                         return {"valid": False, "message": "API Key 无效或已过期"}
@@ -376,18 +354,6 @@ class ModelConfigService:
                     else:
                         return {"valid": False, "message": f"验证失败（HTTP {resp.status_code}）"}
 
-                elif provider == "moonshot":
-                    resp = await client.get(
-                        "https://api.moonshot.cn/v1/models",
-                        headers={"Authorization": f"Bearer {api_key}"},
-                    )
-                    if resp.status_code == 200:
-                        return {"valid": True, "message": "API Key 有效"}
-                    elif resp.status_code == 401:
-                        return {"valid": False, "message": "API Key 无效或已过期"}
-                    else:
-                        return {"valid": False, "message": f"验证失败（HTTP {resp.status_code}）"}
-
                 elif provider == "qwen":
                     base = (api_base or "https://dashscope.aliyuncs.com/compatible-mode/v1").rstrip("/")
                     resp = await client.get(
@@ -401,9 +367,25 @@ class ModelConfigService:
                     else:
                         return {"valid": False, "message": f"验证失败（HTTP {resp.status_code}）"}
 
-                elif provider == "cohere":
+                elif provider == "google":
                     resp = await client.get(
-                        "https://api.cohere.com/v1/models",
+                        f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}",
+                    )
+                    if resp.status_code == 200:
+                        return {"valid": True, "message": "API Key 有效"}
+                    elif resp.status_code == 400:
+                        return {"valid": False, "message": "API Key 无效或已过期"}
+                    elif resp.status_code == 403:
+                        return {"valid": False, "message": "API Key 无权限，请检查 Gemini API 是否已启用"}
+                    else:
+                        return {"valid": False, "message": f"验证失败（HTTP {resp.status_code}）"}
+
+                elif provider == "meta":
+                    if not api_base:
+                        return {"valid": False, "message": "Meta 平台需要填写 API Base URL"}
+                    base = api_base.rstrip("/")
+                    resp = await client.get(
+                        f"{base}/models",
                         headers={"Authorization": f"Bearer {api_key}"},
                     )
                     if resp.status_code == 200:
@@ -413,15 +395,10 @@ class ModelConfigService:
                     else:
                         return {"valid": False, "message": f"验证失败（HTTP {resp.status_code}）"}
 
-                elif provider == "jina":
-                    # Jina 通过发送最小嵌入请求验证
-                    resp = await client.post(
-                        "https://api.jina.ai/v1/embeddings",
-                        headers={
-                            "Authorization": f"Bearer {api_key}",
-                            "Content-Type": "application/json",
-                        },
-                        json={"model": "jina-embeddings-v3", "input": ["test"]},
+                elif provider == "siliconflow":
+                    resp = await client.get(
+                        "https://api.siliconflow.cn/v1/models",
+                        headers={"Authorization": f"Bearer {api_key}"},
                     )
                     if resp.status_code == 200:
                         return {"valid": True, "message": "API Key 有效"}
@@ -430,9 +407,9 @@ class ModelConfigService:
                     else:
                         return {"valid": False, "message": f"验证失败（HTTP {resp.status_code}）"}
 
-                elif provider == "local_llm":
-                    # 本地模型无需验证
-                    return {"valid": True, "message": "本地模型无需验证"}
+                elif provider == "private":
+                    # 私有部署无需验证
+                    return {"valid": True, "message": "私有部署无需验证"}
 
                 else:
                     return {"valid": False, "message": f"不支持的提供商: {provider}"}
@@ -454,50 +431,163 @@ class ModelConfigService:
         api_base: str | None = None
     ) -> list[dict]:
         """
-        通过 DashScope 兼容端点获取可用模型列表并按类型分类。
-        目前仅支持 qwen（阿里云百炼）。
+        获取各提供商可用模型列表并按类型分类。
 
         Returns:
             [{"name": model_id, "model_type": "llm"|"embedding"|"rerank"}, ...]
         """
-        if provider != "qwen":
+        if provider == "private":
             return []
 
-        base = (api_base or "https://dashscope.aliyuncs.com/compatible-mode/v1").rstrip("/")
         timeout = httpx.Timeout(15.0)
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
-                resp = await client.get(
-                    f"{base}/models",
-                    headers={"Authorization": f"Bearer {api_key}"},
-                )
-                if resp.status_code != 200:
+                if provider == "qwen":
+                    base = (api_base or "https://dashscope.aliyuncs.com/compatible-mode/v1").rstrip("/")
+                    resp = await client.get(
+                        f"{base}/models",
+                        headers={"Authorization": f"Bearer {api_key}"},
+                    )
+                    if resp.status_code != 200:
+                        return []
+
+                    data = resp.json()
+                    raw_models = data.get("data", [])
+                    result = []
+                    seen_ids: set[str] = set()
+
+                    for m in raw_models:
+                        mid = m.get("id", "")
+                        if not mid:
+                            continue
+                        if "embedding" in mid:
+                            mtype = "embedding"
+                        elif "rerank" in mid:
+                            mtype = "rerank"
+                        else:
+                            mtype = "llm"
+                        result.append({"name": mid, "model_type": mtype})
+                        seen_ids.add(mid)
+
+                    # 补充已知 rerank 白名单中不在列表里的模型
+                    for rerank_name in ModelConfigService._QWEN_KNOWN_RERANK_MODELS:
+                        if rerank_name not in seen_ids:
+                            result.append({"name": rerank_name, "model_type": "rerank"})
+
+                    return result
+
+                elif provider in ("openai", "deepseek", "meta"):
+                    if provider == "openai":
+                        base = (api_base or "https://api.openai.com/v1").rstrip("/")
+                    elif provider == "deepseek":
+                        base = (api_base or "https://api.deepseek.com/v1").rstrip("/")
+                    else:  # meta
+                        if not api_base:
+                            return []
+                        base = api_base.rstrip("/")
+
+                    resp = await client.get(
+                        f"{base}/models",
+                        headers={"Authorization": f"Bearer {api_key}"},
+                    )
+                    if resp.status_code != 200:
+                        return []
+
+                    data = resp.json()
+                    raw_models = data.get("data", [])
+                    result = []
+                    for m in raw_models:
+                        mid = m.get("id", "")
+                        if not mid:
+                            continue
+                        if "embedding" in mid.lower():
+                            mtype = "embedding"
+                        else:
+                            mtype = "llm"
+                        result.append({"name": mid, "model_type": mtype})
+                    return result
+
+                elif provider == "zhipuai":
+                    resp = await client.get(
+                        "https://open.bigmodel.cn/api/paas/v4/models",
+                        headers={"Authorization": f"Bearer {api_key}"},
+                    )
+                    if resp.status_code != 200:
+                        return []
+
+                    data = resp.json()
+                    raw_models = data.get("data", [])
+                    result = []
+                    seen_ids: set[str] = set()
+                    for m in raw_models:
+                        mid = m.get("id", "")
+                        if not mid:
+                            continue
+                        if "embedding" in mid.lower():
+                            mtype = "embedding"
+                        elif "rerank" in mid.lower():
+                            mtype = "rerank"
+                        else:
+                            mtype = "llm"
+                        result.append({"name": mid, "model_type": mtype})
+                        seen_ids.add(mid)
+
+                    # /models 接口不返回 embedding/rerank 模型，手动补充已知模型
+                    for emb in ["embedding-3", "embedding-2"]:
+                        if emb not in seen_ids:
+                            result.append({"name": emb, "model_type": "embedding"})
+                    return result
+
+                elif provider == "google":
+                    resp = await client.get(
+                        f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}",
+                    )
+                    if resp.status_code != 200:
+                        return []
+
+                    data = resp.json()
+                    raw_models = data.get("models", [])
+                    result = []
+                    for m in raw_models:
+                        full_name = m.get("name", "")
+                        mid = full_name.removeprefix("models/")
+                        if not mid:
+                            continue
+                        methods = m.get("supportedGenerationMethods", [])
+                        if "embedContent" in methods:
+                            mtype = "embedding"
+                        else:
+                            mtype = "llm"
+                        result.append({"name": mid, "model_type": mtype})
+                    return result
+
+                elif provider == "siliconflow":
+                    resp = await client.get(
+                        "https://api.siliconflow.cn/v1/models",
+                        headers={"Authorization": f"Bearer {api_key}"},
+                    )
+                    if resp.status_code != 200:
+                        return []
+
+                    data = resp.json()
+                    raw_models = data.get("data", [])
+                    result = []
+                    for m in raw_models:
+                        mid = m.get("id", "")
+                        if not mid:
+                            continue
+                        if "embedding" in mid.lower():
+                            mtype = "embedding"
+                        elif "rerank" in mid.lower():
+                            mtype = "rerank"
+                        else:
+                            mtype = "llm"
+                        result.append({"name": mid, "model_type": mtype})
+                    return result
+
+                else:
                     return []
 
-                data = resp.json()
-                raw_models = data.get("data", [])
-                result = []
-                seen_ids: set[str] = set()
-
-                for m in raw_models:
-                    mid = m.get("id", "")
-                    if not mid:
-                        continue
-                    if "embedding" in mid:
-                        mtype = "embedding"
-                    elif "rerank" in mid:
-                        mtype = "rerank"
-                    else:
-                        mtype = "llm"
-                    result.append({"name": mid, "model_type": mtype})
-                    seen_ids.add(mid)
-
-                # 补充已知 rerank 白名单中不在列表里的模型
-                for rerank_name in ModelConfigService._QWEN_KNOWN_RERANK_MODELS:
-                    if rerank_name not in seen_ids:
-                        result.append({"name": rerank_name, "model_type": "rerank"})
-
-                return result
         except Exception:
             return []
 

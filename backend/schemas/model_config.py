@@ -7,13 +7,13 @@ from pydantic import BaseModel, Field
 
 class ModelConfigCreateRequest(BaseModel):
     """创建模型配置请求"""
-    provider: str = Field(..., description="LLM提供商(openai/anthropic/azure_openai/deepseek/zhipuai/moonshot/qwen/cohere/jina/local_llm)")
+    provider: str = Field(..., description="LLM提供商(openai/deepseek/zhipuai/qwen/google/meta/siliconflow/private)")
     model_name: str = Field(..., min_length=1, max_length=128, description="模型名称")
     model_type: str = Field("llm", description="模型类型(llm/embedding/rerank)")
     api_key: str | None = Field(None, max_length=512, description="API密钥")
     api_base: str | None = Field(None, max_length=512, description="API基础URL")
     temperature: float = Field(0.7, ge=0, le=2, description="温度参数")
-    max_tokens: int = Field(2000, ge=1, le=128000, description="最大Token数")
+    max_tokens: int = Field(2000, ge=0, le=128000, description="最大Token数")
     top_p: float | None = Field(None, ge=0, le=1, description="Top-P参数")
     use_case: str | None = Field(None, max_length=64, description="使用场景(dialogue/rag/translation等)")
     is_default: bool = Field(False, description="是否为默认模型")
@@ -28,7 +28,7 @@ class ModelConfigUpdateRequest(BaseModel):
     api_key: str | None = Field(None, max_length=512, description="API密钥")
     api_base: str | None = Field(None, max_length=512, description="API基础URL")
     temperature: float | None = Field(None, ge=0, le=2, description="温度参数")
-    max_tokens: int | None = Field(None, ge=1, le=128000, description="最大Token数")
+    max_tokens: int | None = Field(None, ge=0, le=128000, description="最大Token数")
     top_p: float | None = Field(None, ge=0, le=1, description="Top-P参数")
     use_case: str | None = Field(None, max_length=64, description="使用场景")
     is_default: bool | None = Field(None, description="是否为默认模型")

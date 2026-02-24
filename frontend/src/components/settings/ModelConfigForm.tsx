@@ -51,12 +51,13 @@ const PLATFORM_CATALOG: Record<string, PlatformInfo> = {
     rerank: [],
     needsApiBase: true,
   },
-  anthropic: {
-    name: 'Anthropic',
-    description: 'Claude 3.5 Sonnet / Haiku 等',
-    llm: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229', 'claude-3-haiku-20240307'],
-    embedding: [],
+  qwen: {
+    name: '通义千问',
+    description: 'Qwen-Max / Plus / Turbo',
+    llm: ['qwen-max', 'qwen-plus', 'qwen-turbo'],
+    embedding: ['text-embedding-v3', 'text-embedding-v2'],
     rerank: [],
+    needsApiBase: true,
   },
   deepseek: {
     name: 'DeepSeek',
@@ -73,34 +74,36 @@ const PLATFORM_CATALOG: Record<string, PlatformInfo> = {
     embedding: ['embedding-3'],
     rerank: [],
   },
-  moonshot: {
-    name: 'Moonshot (Kimi)',
-    description: 'Moonshot-v1 系列',
-    llm: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'],
-    embedding: [],
+  google: {
+    name: 'Google Gemini',
+    description: 'Gemini 2.0 / 1.5 系列',
+    llm: ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'],
+    embedding: ['text-embedding-004'],
     rerank: [],
   },
-  qwen: {
-    name: '通义千问',
-    description: 'Qwen-Max / Plus / Turbo',
-    llm: ['qwen-max', 'qwen-plus', 'qwen-turbo'],
-    embedding: ['text-embedding-v3', 'text-embedding-v2'],
+  meta: {
+    name: 'Meta (自定义)',
+    description: 'Llama 系列，自定义 base URL',
+    llm: ['llama-3.3-70b-instruct', 'llama-3.1-8b-instruct'],
+    embedding: [],
     rerank: [],
     needsApiBase: true,
   },
-  cohere: {
-    name: 'Cohere',
-    description: 'Command-R + Rerank',
-    llm: ['command-r-plus', 'command-r'],
-    embedding: ['embed-multilingual-v3.0', 'embed-english-v3.0'],
-    rerank: ['rerank-v3.5', 'rerank-multilingual-v3.0'],
+  siliconflow: {
+    name: '硅基流动',
+    description: 'SiliconFlow 开源模型',
+    llm: ['Qwen/Qwen2.5-72B-Instruct', 'deepseek-ai/DeepSeek-V3'],
+    embedding: ['BAAI/bge-m3', 'BAAI/bge-large-zh-v1.5'],
+    rerank: ['BAAI/bge-reranker-v2-m3'],
+    needsApiBase: true,
   },
-  jina: {
-    name: 'Jina AI',
-    description: '嵌入 & 重排模型',
+  private: {
+    name: '私有部署',
+    description: '私有/自托管模型',
     llm: [],
-    embedding: ['jina-embeddings-v3', 'jina-embeddings-v2-base-zh'],
-    rerank: ['jina-reranker-v2-base-multilingual', 'jina-reranker-v1-base-en'],
+    embedding: [],
+    rerank: [],
+    needsApiBase: true,
   },
 };
 
@@ -111,7 +114,7 @@ const MODEL_TYPE_LABELS: Record<ModelType, string> = {
 };
 
 // 支持自动发现模型的提供商
-const DISCOVER_CAPABLE_PROVIDERS = new Set(['qwen']);
+const DISCOVER_CAPABLE_PROVIDERS = new Set(['openai', 'qwen', 'deepseek', 'zhipuai', 'google', 'meta', 'siliconflow']);
 
 // 每个平台的配置状态
 interface PlatformConfig {
@@ -140,54 +143,59 @@ export default function ModelConfigForm() {
   const [discoveredModels, setDiscoveredModels] = useState<DiscoveredModel[]>([]);
   const [discovering, setDiscovering] = useState(false);
   const [batchSaving, setBatchSaving] = useState(false);
+  // 已保存的发现模型（按 provider 存储，用于填充下方选择器）
+  const [providerDiscoveredModels, setProviderDiscoveredModels] = useState<Record<string, DiscoveredModel[]>>({});
 
   // 初始化：从后端加载已有配置
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const resp = await settingsApi.getModelConfigs();
-        if (resp.success && resp.data) {
-          const merged: Record<string, PlatformConfig> = {};
-          for (const cfg of resp.data) {
-            const provider = cfg.provider;
-            if (!merged[provider]) {
-              merged[provider] = {
-                api_key: cfg.api_key || '',
-                api_base: cfg.api_base || '',
-                llm_model: '',
-                embedding_model: '',
-                rerank_model: '',
-              };
-            }
-            // 用已有 api_key（同一 provider 共享）
-            if (cfg.api_key) merged[provider].api_key = cfg.api_key;
-            if (cfg.api_base) merged[provider].api_base = cfg.api_base;
-
-            if (cfg.model_type === 'llm') {
-              merged[provider].llm_model = cfg.model_name;
-              merged[provider].llm_id = cfg.id;
-            } else if (cfg.model_type === 'embedding') {
-              merged[provider].embedding_model = cfg.model_name;
-              merged[provider].embedding_id = cfg.id;
-            } else if (cfg.model_type === 'rerank') {
-              merged[provider].rerank_model = cfg.model_name;
-              merged[provider].rerank_id = cfg.id;
-            }
+  const loadConfigs = async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const resp = await settingsApi.getModelConfigs();
+      if (resp.success && resp.data) {
+        const merged: Record<string, PlatformConfig> = {};
+        for (const cfg of resp.data) {
+          const provider = cfg.provider;
+          if (!merged[provider]) {
+            merged[provider] = {
+              api_key: cfg.api_key || '',
+              api_base: cfg.api_base || '',
+              llm_model: '',
+              embedding_model: '',
+              rerank_model: '',
+            };
           }
-          setConfigs(merged);
+          // 用已有 api_key（同一 provider 共享）
+          if (cfg.api_key) merged[provider].api_key = cfg.api_key;
+          if (cfg.api_base) merged[provider].api_base = cfg.api_base;
 
-          // 自动展开第一个已有配置的平台
+          if (cfg.model_type === 'llm') {
+            merged[provider].llm_model = cfg.model_name;
+            merged[provider].llm_id = cfg.id;
+          } else if (cfg.model_type === 'embedding') {
+            merged[provider].embedding_model = cfg.model_name;
+            merged[provider].embedding_id = cfg.id;
+          } else if (cfg.model_type === 'rerank') {
+            merged[provider].rerank_model = cfg.model_name;
+            merged[provider].rerank_id = cfg.id;
+          }
+        }
+        setConfigs(merged);
+
+        // 自动展开第一个已有配置的平台（仅初始加载时）
+        if (!silent) {
           const firstConfigured = Object.keys(merged)[0];
           if (firstConfigured) setSelectedProvider(firstConfigured);
         }
-      } catch {
-        message.error('加载模型配置失败');
-      } finally {
-        setLoading(false);
       }
-    };
-    load();
+    } catch {
+      message.error('加载模型配置失败');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadConfigs();
   }, []);
 
   const getConfig = (provider: string): PlatformConfig => {
@@ -259,7 +267,14 @@ export default function ModelConfigForm() {
       const resp = await settingsApi.batchSaveModels(items);
       if (resp.success) {
         message.success(`已保存 ${discoveredModels.length} 个模型配置`);
+        // 持久化已发现模型，用于填充下方选择器
+        setProviderDiscoveredModels(prev => ({
+          ...prev,
+          [selectedProvider]: discoveredModels,
+        }));
         setDiscoveredModels([]);
+        // 重新加载配置以获取保存后的 ID
+        await loadConfigs(true);
       } else {
         message.error('批量保存失败，请重试');
       }
@@ -274,6 +289,18 @@ export default function ModelConfigForm() {
   const handleValidate = async () => {
     if (!selectedProvider) return;
     const cfg = getConfig(selectedProvider);
+
+    // 私有部署：若无 API Key 但有 API Base，直接标记为有效
+    if (selectedProvider === 'private' && !cfg.api_key.trim()) {
+      if (!cfg.api_base?.trim()) {
+        message.warning('请先填写 API Base URL');
+        return;
+      }
+      setValidationStatus('valid');
+      setValidationMsg('私有部署无需验证');
+      return;
+    }
+
     if (!cfg.api_key.trim()) {
       message.warning('请先输入 API Key');
       return;
@@ -305,23 +332,29 @@ export default function ModelConfigForm() {
     const cfg = getConfig(selectedProvider);
     const catalog = PLATFORM_CATALOG[selectedProvider];
 
-    if (!cfg.api_key.trim()) {
-      message.warning('请输入 API Key');
-      return;
-    }
-
-    // 必须先验证或已验证有效
-    if (validationStatus === 'idle') {
-      message.warning('请先验证 API Key 有效性');
-      return;
-    }
-    if (validationStatus === 'invalid') {
-      message.error('API Key 无效，请更正后重试');
-      return;
-    }
-    if (validationStatus === 'validating') {
-      message.warning('正在验证中，请稍候');
-      return;
+    // 私有部署：API Key 可选，API Base 必填，无需验证
+    if (selectedProvider === 'private') {
+      if (!cfg.api_base?.trim()) {
+        message.warning('私有部署需要填写 API Base URL');
+        return;
+      }
+    } else {
+      if (!cfg.api_key.trim()) {
+        message.warning('请输入 API Key');
+        return;
+      }
+      if (validationStatus === 'idle') {
+        message.warning('请先验证 API Key 有效性');
+        return;
+      }
+      if (validationStatus === 'invalid') {
+        message.error('API Key 无效，请更正后重试');
+        return;
+      }
+      if (validationStatus === 'validating') {
+        message.warning('正在验证中，请稍候');
+        return;
+      }
     }
 
     setSaving(true);
@@ -417,6 +450,16 @@ export default function ModelConfigForm() {
   const currentCatalog = selectedProvider ? PLATFORM_CATALOG[selectedProvider] : null;
   const currentConfig = selectedProvider ? getConfig(selectedProvider) : null;
 
+  // 合并静态目录与已发现模型，作为选择器选项
+  const getModelOptions = (type: 'llm' | 'embedding' | 'rerank'): string[] => {
+    if (!selectedProvider) return [];
+    const catalogModels = PLATFORM_CATALOG[selectedProvider]?.[type] || [];
+    const discovered = (providerDiscoveredModels[selectedProvider] || [])
+      .filter(m => m.model_type === type)
+      .map(m => m.name);
+    return Array.from(new Set([...catalogModels, ...discovered]));
+  };
+
   return (
     <div className="space-y-4">
       {/* 平台选择 */}
@@ -429,10 +472,11 @@ export default function ModelConfigForm() {
           {Object.entries(PLATFORM_CATALOG).map(([provider, info]) => {
             const isSelected = selectedProvider === provider;
             const hasConfig = !!configs[provider]?.api_key;
+            const discovered = providerDiscoveredModels[provider] || [];
             const supportedTypes: ModelType[] = [];
-            if (info.llm.length > 0) supportedTypes.push('llm');
-            if (info.embedding.length > 0) supportedTypes.push('embedding');
-            if (info.rerank.length > 0) supportedTypes.push('rerank');
+            if (info.llm.length > 0 || discovered.some(m => m.model_type === 'llm')) supportedTypes.push('llm');
+            if (info.embedding.length > 0 || discovered.some(m => m.model_type === 'embedding')) supportedTypes.push('embedding');
+            if (info.rerank.length > 0 || discovered.some(m => m.model_type === 'rerank')) supportedTypes.push('rerank');
 
             return (
               <Col key={provider} xs={12} sm={8} md={6}>
@@ -498,7 +542,11 @@ export default function ModelConfigForm() {
           {/* API Key */}
           <div className="mb-4">
             <Text strong className="block mb-1">
-              API Key <Text type="danger">*</Text>
+              API Key{' '}
+              {selectedProvider === 'private'
+                ? <Text type="secondary">（可选）</Text>
+                : <Text type="danger">*</Text>
+              }
             </Text>
             <Space.Compact style={{ width: '100%' }}>
               <Input.Password
@@ -614,8 +662,19 @@ export default function ModelConfigForm() {
             );
           })()}
 
-          {/* 自定义 API Base（可折叠） */}
-          {currentCatalog.needsApiBase && (
+          {/* 自定义 API Base（私有部署必填，其他平台可折叠） */}
+          {selectedProvider === 'private' ? (
+            <div className="mb-4">
+              <Text strong className="block mb-1">
+                API Base URL <Text type="danger">*</Text>
+              </Text>
+              <Input
+                value={currentConfig.api_base}
+                onChange={e => updateConfig(selectedProvider, { api_base: e.target.value })}
+                placeholder="例如：http://localhost:11434/v1"
+              />
+            </div>
+          ) : currentCatalog.needsApiBase ? (
             <Collapse
               ghost
               size="small"
@@ -634,80 +693,89 @@ export default function ModelConfigForm() {
                 },
               ]}
             />
-          )}
+          ) : null}
 
           <Divider style={{ margin: '12px 0' }} />
 
           {/* 大语言模型 */}
-          {currentCatalog.llm.length > 0 && (
-            <div className="mb-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Tag color="blue">大语言模型</Tag>
-                <Text type="secondary" style={{ fontSize: 12 }}>用于对话和文本生成</Text>
+          {(() => {
+            const llmOptions = getModelOptions('llm');
+            return llmOptions.length > 0 ? (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Tag color="blue">大语言模型</Tag>
+                  <Text type="secondary" style={{ fontSize: 12 }}>用于对话和文本生成</Text>
+                </div>
+                <Select
+                  value={currentConfig.llm_model || llmOptions[0]}
+                  onChange={v => updateConfig(selectedProvider, { llm_model: v })}
+                  style={{ width: '100%' }}
+                >
+                  {llmOptions.map(m => (
+                    <Option key={m} value={m}>{m}</Option>
+                  ))}
+                </Select>
               </div>
-              <Select
-                value={currentConfig.llm_model || currentCatalog.llm[0]}
-                onChange={v => updateConfig(selectedProvider, { llm_model: v })}
-                style={{ width: '100%' }}
-              >
-                {currentCatalog.llm.map(m => (
-                  <Option key={m} value={m}>{m}</Option>
-                ))}
-              </Select>
-            </div>
-          )}
+            ) : null;
+          })()}
 
           {/* 嵌入模型 */}
-          {currentCatalog.embedding.length > 0 ? (
-            <div className="mb-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Tag color="green">嵌入模型</Tag>
-                <Text type="secondary" style={{ fontSize: 12 }}>用于知识库向量化检索</Text>
+          {(() => {
+            const embOptions = getModelOptions('embedding');
+            return embOptions.length > 0 ? (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Tag color="green">嵌入模型</Tag>
+                  <Text type="secondary" style={{ fontSize: 12 }}>用于知识库向量化检索</Text>
+                </div>
+                <Select
+                  value={currentConfig.embedding_model || embOptions[0]}
+                  onChange={v => updateConfig(selectedProvider, { embedding_model: v })}
+                  style={{ width: '100%' }}
+                >
+                  {embOptions.map(m => (
+                    <Option key={m} value={m}>{m}</Option>
+                  ))}
+                </Select>
               </div>
-              <Select
-                value={currentConfig.embedding_model || currentCatalog.embedding[0]}
-                onChange={v => updateConfig(selectedProvider, { embedding_model: v })}
-                style={{ width: '100%' }}
-              >
-                {currentCatalog.embedding.map(m => (
-                  <Option key={m} value={m}>{m}</Option>
-                ))}
-              </Select>
-            </div>
-          ) : (
-            <div className="mb-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Tag color="default">嵌入模型</Tag>
+            ) : (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Tag color="default">嵌入模型</Tag>
+                </div>
+                <Text type="secondary" style={{ fontSize: 12 }}>当前平台不提供嵌入模型</Text>
               </div>
-              <Text type="secondary" style={{ fontSize: 12 }}>当前平台不提供嵌入模型</Text>
-            </div>
-          )}
+            );
+          })()}
 
           {/* 重排模型 */}
-          {currentCatalog.rerank.length > 0 ? (
-            <div className="mb-2">
-              <div className="flex items-center gap-2 mb-1">
-                <Tag color="orange">重排模型</Tag>
-                <Text type="secondary" style={{ fontSize: 12 }}>用于 RAG 检索结果重新排序</Text>
+          {(() => {
+            const rerankOptions = getModelOptions('rerank');
+            return rerankOptions.length > 0 ? (
+              <div className="mb-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <Tag color="orange">重排模型</Tag>
+                  <Text type="secondary" style={{ fontSize: 12 }}>用于 RAG 检索结果重新排序</Text>
+                </div>
+                <Select
+                  value={currentConfig.rerank_model || rerankOptions[0]}
+                  onChange={v => updateConfig(selectedProvider, { rerank_model: v })}
+                  style={{ width: '100%' }}
+                >
+                  {rerankOptions.map(m => (
+                    <Option key={m} value={m}>{m}</Option>
+                  ))}
+                </Select>
               </div>
-              <Select
-                value={currentConfig.rerank_model || currentCatalog.rerank[0]}
-                onChange={v => updateConfig(selectedProvider, { rerank_model: v })}
-                style={{ width: '100%' }}
-              >
-                {currentCatalog.rerank.map(m => (
-                  <Option key={m} value={m}>{m}</Option>
-                ))}
-              </Select>
-            </div>
-          ) : (
-            <div className="mb-2">
-              <div className="flex items-center gap-2 mb-1">
-                <Tag color="default">重排模型</Tag>
+            ) : (
+              <div className="mb-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <Tag color="default">重排模型</Tag>
+                </div>
+                <Text type="secondary" style={{ fontSize: 12 }}>当前平台不提供重排模型</Text>
               </div>
-              <Text type="secondary" style={{ fontSize: 12 }}>当前平台不提供重排模型</Text>
-            </div>
-          )}
+            );
+          })()}
         </Card>
       )}
     </div>
