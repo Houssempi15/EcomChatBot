@@ -140,54 +140,59 @@ export default function ModelConfigForm() {
   const [discoveredModels, setDiscoveredModels] = useState<DiscoveredModel[]>([]);
   const [discovering, setDiscovering] = useState(false);
   const [batchSaving, setBatchSaving] = useState(false);
+  // 已保存的发现模型（按 provider 存储，用于填充下方选择器）
+  const [providerDiscoveredModels, setProviderDiscoveredModels] = useState<Record<string, DiscoveredModel[]>>({});
 
   // 初始化：从后端加载已有配置
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const resp = await settingsApi.getModelConfigs();
-        if (resp.success && resp.data) {
-          const merged: Record<string, PlatformConfig> = {};
-          for (const cfg of resp.data) {
-            const provider = cfg.provider;
-            if (!merged[provider]) {
-              merged[provider] = {
-                api_key: cfg.api_key || '',
-                api_base: cfg.api_base || '',
-                llm_model: '',
-                embedding_model: '',
-                rerank_model: '',
-              };
-            }
-            // 用已有 api_key（同一 provider 共享）
-            if (cfg.api_key) merged[provider].api_key = cfg.api_key;
-            if (cfg.api_base) merged[provider].api_base = cfg.api_base;
-
-            if (cfg.model_type === 'llm') {
-              merged[provider].llm_model = cfg.model_name;
-              merged[provider].llm_id = cfg.id;
-            } else if (cfg.model_type === 'embedding') {
-              merged[provider].embedding_model = cfg.model_name;
-              merged[provider].embedding_id = cfg.id;
-            } else if (cfg.model_type === 'rerank') {
-              merged[provider].rerank_model = cfg.model_name;
-              merged[provider].rerank_id = cfg.id;
-            }
+  const loadConfigs = async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const resp = await settingsApi.getModelConfigs();
+      if (resp.success && resp.data) {
+        const merged: Record<string, PlatformConfig> = {};
+        for (const cfg of resp.data) {
+          const provider = cfg.provider;
+          if (!merged[provider]) {
+            merged[provider] = {
+              api_key: cfg.api_key || '',
+              api_base: cfg.api_base || '',
+              llm_model: '',
+              embedding_model: '',
+              rerank_model: '',
+            };
           }
-          setConfigs(merged);
+          // 用已有 api_key（同一 provider 共享）
+          if (cfg.api_key) merged[provider].api_key = cfg.api_key;
+          if (cfg.api_base) merged[provider].api_base = cfg.api_base;
 
-          // 自动展开第一个已有配置的平台
+          if (cfg.model_type === 'llm') {
+            merged[provider].llm_model = cfg.model_name;
+            merged[provider].llm_id = cfg.id;
+          } else if (cfg.model_type === 'embedding') {
+            merged[provider].embedding_model = cfg.model_name;
+            merged[provider].embedding_id = cfg.id;
+          } else if (cfg.model_type === 'rerank') {
+            merged[provider].rerank_model = cfg.model_name;
+            merged[provider].rerank_id = cfg.id;
+          }
+        }
+        setConfigs(merged);
+
+        // 自动展开第一个已有配置的平台（仅初始加载时）
+        if (!silent) {
           const firstConfigured = Object.keys(merged)[0];
           if (firstConfigured) setSelectedProvider(firstConfigured);
         }
-      } catch {
-        message.error('加载模型配置失败');
-      } finally {
-        setLoading(false);
       }
-    };
-    load();
+    } catch {
+      message.error('加载模型配置失败');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadConfigs();
   }, []);
 
   const getConfig = (provider: string): PlatformConfig => {
@@ -259,7 +264,14 @@ export default function ModelConfigForm() {
       const resp = await settingsApi.batchSaveModels(items);
       if (resp.success) {
         message.success(`已保存 ${discoveredModels.length} 个模型配置`);
+        // 持久化已发现模型，用于填充下方选择器
+        setProviderDiscoveredModels(prev => ({
+          ...prev,
+          [selectedProvider]: discoveredModels,
+        }));
         setDiscoveredModels([]);
+        // 重新加载配置以获取保存后的 ID
+        await loadConfigs(true);
       } else {
         message.error('批量保存失败，请重试');
       }
@@ -417,6 +429,16 @@ export default function ModelConfigForm() {
   const currentCatalog = selectedProvider ? PLATFORM_CATALOG[selectedProvider] : null;
   const currentConfig = selectedProvider ? getConfig(selectedProvider) : null;
 
+  // 合并静态目录与已发现模型，作为选择器选项
+  const getModelOptions = (type: 'llm' | 'embedding' | 'rerank'): string[] => {
+    if (!selectedProvider) return [];
+    const catalogModels = PLATFORM_CATALOG[selectedProvider]?.[type] || [];
+    const discovered = (providerDiscoveredModels[selectedProvider] || [])
+      .filter(m => m.model_type === type)
+      .map(m => m.name);
+    return Array.from(new Set([...catalogModels, ...discovered]));
+  };
+
   return (
     <div className="space-y-4">
       {/* 平台选择 */}
@@ -429,10 +451,11 @@ export default function ModelConfigForm() {
           {Object.entries(PLATFORM_CATALOG).map(([provider, info]) => {
             const isSelected = selectedProvider === provider;
             const hasConfig = !!configs[provider]?.api_key;
+            const discovered = providerDiscoveredModels[provider] || [];
             const supportedTypes: ModelType[] = [];
-            if (info.llm.length > 0) supportedTypes.push('llm');
-            if (info.embedding.length > 0) supportedTypes.push('embedding');
-            if (info.rerank.length > 0) supportedTypes.push('rerank');
+            if (info.llm.length > 0 || discovered.some(m => m.model_type === 'llm')) supportedTypes.push('llm');
+            if (info.embedding.length > 0 || discovered.some(m => m.model_type === 'embedding')) supportedTypes.push('embedding');
+            if (info.rerank.length > 0 || discovered.some(m => m.model_type === 'rerank')) supportedTypes.push('rerank');
 
             return (
               <Col key={provider} xs={12} sm={8} md={6}>
@@ -639,75 +662,84 @@ export default function ModelConfigForm() {
           <Divider style={{ margin: '12px 0' }} />
 
           {/* 大语言模型 */}
-          {currentCatalog.llm.length > 0 && (
-            <div className="mb-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Tag color="blue">大语言模型</Tag>
-                <Text type="secondary" style={{ fontSize: 12 }}>用于对话和文本生成</Text>
+          {(() => {
+            const llmOptions = getModelOptions('llm');
+            return llmOptions.length > 0 ? (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Tag color="blue">大语言模型</Tag>
+                  <Text type="secondary" style={{ fontSize: 12 }}>用于对话和文本生成</Text>
+                </div>
+                <Select
+                  value={currentConfig.llm_model || llmOptions[0]}
+                  onChange={v => updateConfig(selectedProvider, { llm_model: v })}
+                  style={{ width: '100%' }}
+                >
+                  {llmOptions.map(m => (
+                    <Option key={m} value={m}>{m}</Option>
+                  ))}
+                </Select>
               </div>
-              <Select
-                value={currentConfig.llm_model || currentCatalog.llm[0]}
-                onChange={v => updateConfig(selectedProvider, { llm_model: v })}
-                style={{ width: '100%' }}
-              >
-                {currentCatalog.llm.map(m => (
-                  <Option key={m} value={m}>{m}</Option>
-                ))}
-              </Select>
-            </div>
-          )}
+            ) : null;
+          })()}
 
           {/* 嵌入模型 */}
-          {currentCatalog.embedding.length > 0 ? (
-            <div className="mb-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Tag color="green">嵌入模型</Tag>
-                <Text type="secondary" style={{ fontSize: 12 }}>用于知识库向量化检索</Text>
+          {(() => {
+            const embOptions = getModelOptions('embedding');
+            return embOptions.length > 0 ? (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Tag color="green">嵌入模型</Tag>
+                  <Text type="secondary" style={{ fontSize: 12 }}>用于知识库向量化检索</Text>
+                </div>
+                <Select
+                  value={currentConfig.embedding_model || embOptions[0]}
+                  onChange={v => updateConfig(selectedProvider, { embedding_model: v })}
+                  style={{ width: '100%' }}
+                >
+                  {embOptions.map(m => (
+                    <Option key={m} value={m}>{m}</Option>
+                  ))}
+                </Select>
               </div>
-              <Select
-                value={currentConfig.embedding_model || currentCatalog.embedding[0]}
-                onChange={v => updateConfig(selectedProvider, { embedding_model: v })}
-                style={{ width: '100%' }}
-              >
-                {currentCatalog.embedding.map(m => (
-                  <Option key={m} value={m}>{m}</Option>
-                ))}
-              </Select>
-            </div>
-          ) : (
-            <div className="mb-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Tag color="default">嵌入模型</Tag>
+            ) : (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Tag color="default">嵌入模型</Tag>
+                </div>
+                <Text type="secondary" style={{ fontSize: 12 }}>当前平台不提供嵌入模型</Text>
               </div>
-              <Text type="secondary" style={{ fontSize: 12 }}>当前平台不提供嵌入模型</Text>
-            </div>
-          )}
+            );
+          })()}
 
           {/* 重排模型 */}
-          {currentCatalog.rerank.length > 0 ? (
-            <div className="mb-2">
-              <div className="flex items-center gap-2 mb-1">
-                <Tag color="orange">重排模型</Tag>
-                <Text type="secondary" style={{ fontSize: 12 }}>用于 RAG 检索结果重新排序</Text>
+          {(() => {
+            const rerankOptions = getModelOptions('rerank');
+            return rerankOptions.length > 0 ? (
+              <div className="mb-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <Tag color="orange">重排模型</Tag>
+                  <Text type="secondary" style={{ fontSize: 12 }}>用于 RAG 检索结果重新排序</Text>
+                </div>
+                <Select
+                  value={currentConfig.rerank_model || rerankOptions[0]}
+                  onChange={v => updateConfig(selectedProvider, { rerank_model: v })}
+                  style={{ width: '100%' }}
+                >
+                  {rerankOptions.map(m => (
+                    <Option key={m} value={m}>{m}</Option>
+                  ))}
+                </Select>
               </div>
-              <Select
-                value={currentConfig.rerank_model || currentCatalog.rerank[0]}
-                onChange={v => updateConfig(selectedProvider, { rerank_model: v })}
-                style={{ width: '100%' }}
-              >
-                {currentCatalog.rerank.map(m => (
-                  <Option key={m} value={m}>{m}</Option>
-                ))}
-              </Select>
-            </div>
-          ) : (
-            <div className="mb-2">
-              <div className="flex items-center gap-2 mb-1">
-                <Tag color="default">重排模型</Tag>
+            ) : (
+              <div className="mb-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <Tag color="default">重排模型</Tag>
+                </div>
+                <Text type="secondary" style={{ fontSize: 12 }}>当前平台不提供重排模型</Text>
               </div>
-              <Text type="secondary" style={{ fontSize: 12 }}>当前平台不提供重排模型</Text>
-            </div>
-          )}
+            );
+          })()}
         </Card>
       )}
     </div>
