@@ -135,7 +135,7 @@ export interface KnowledgeSearchResult {
 }
 
 // Settings Types
-export type ModelProvider = 'openai' | 'anthropic' | 'azure_openai' | 'deepseek' | 'zhipuai' | 'moonshot' | 'qwen' | 'cohere' | 'jina' | 'local_llm';
+export type ModelProvider = 'openai' | 'deepseek' | 'zhipuai' | 'qwen' | 'google' | 'meta' | 'siliconflow' | 'private';
 export type ModelType = 'llm' | 'embedding' | 'rerank';
 
 export interface LLMConfig {

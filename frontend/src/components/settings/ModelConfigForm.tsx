@@ -51,12 +51,13 @@ const PLATFORM_CATALOG: Record<string, PlatformInfo> = {
     rerank: [],
     needsApiBase: true,
   },
-  anthropic: {
-    name: 'Anthropic',
-    description: 'Claude 3.5 Sonnet / Haiku 等',
-    llm: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229', 'claude-3-haiku-20240307'],
-    embedding: [],
+  qwen: {
+    name: '通义千问',
+    description: 'Qwen-Max / Plus / Turbo',
+    llm: ['qwen-max', 'qwen-plus', 'qwen-turbo'],
+    embedding: ['text-embedding-v3', 'text-embedding-v2'],
     rerank: [],
+    needsApiBase: true,
   },
   deepseek: {
     name: 'DeepSeek',
@@ -73,34 +74,36 @@ const PLATFORM_CATALOG: Record<string, PlatformInfo> = {
     embedding: ['embedding-3'],
     rerank: [],
   },
-  moonshot: {
-    name: 'Moonshot (Kimi)',
-    description: 'Moonshot-v1 系列',
-    llm: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'],
-    embedding: [],
+  google: {
+    name: 'Google Gemini',
+    description: 'Gemini 2.0 / 1.5 系列',
+    llm: ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'],
+    embedding: ['text-embedding-004'],
     rerank: [],
   },
-  qwen: {
-    name: '通义千问',
-    description: 'Qwen-Max / Plus / Turbo',
-    llm: ['qwen-max', 'qwen-plus', 'qwen-turbo'],
-    embedding: ['text-embedding-v3', 'text-embedding-v2'],
+  meta: {
+    name: 'Meta (自定义)',
+    description: 'Llama 系列，自定义 base URL',
+    llm: ['llama-3.3-70b-instruct', 'llama-3.1-8b-instruct'],
+    embedding: [],
     rerank: [],
     needsApiBase: true,
   },
-  cohere: {
-    name: 'Cohere',
-    description: 'Command-R + Rerank',
-    llm: ['command-r-plus', 'command-r'],
-    embedding: ['embed-multilingual-v3.0', 'embed-english-v3.0'],
-    rerank: ['rerank-v3.5', 'rerank-multilingual-v3.0'],
+  siliconflow: {
+    name: '硅基流动',
+    description: 'SiliconFlow 开源模型',
+    llm: ['Qwen/Qwen2.5-72B-Instruct', 'deepseek-ai/DeepSeek-V3'],
+    embedding: ['BAAI/bge-m3', 'BAAI/bge-large-zh-v1.5'],
+    rerank: ['BAAI/bge-reranker-v2-m3'],
+    needsApiBase: true,
   },
-  jina: {
-    name: 'Jina AI',
-    description: '嵌入 & 重排模型',
+  private: {
+    name: '私有部署',
+    description: '私有/自托管模型',
     llm: [],
-    embedding: ['jina-embeddings-v3', 'jina-embeddings-v2-base-zh'],
-    rerank: ['jina-reranker-v2-base-multilingual', 'jina-reranker-v1-base-en'],
+    embedding: [],
+    rerank: [],
+    needsApiBase: true,
   },
 };
 
@@ -111,7 +114,7 @@ const MODEL_TYPE_LABELS: Record<ModelType, string> = {
 };
 
 // 支持自动发现模型的提供商
-const DISCOVER_CAPABLE_PROVIDERS = new Set(['qwen']);
+const DISCOVER_CAPABLE_PROVIDERS = new Set(['openai', 'qwen', 'deepseek', 'zhipuai', 'google', 'meta', 'siliconflow']);
 
 // 每个平台的配置状态
 interface PlatformConfig {
@@ -286,6 +289,18 @@ export default function ModelConfigForm() {
   const handleValidate = async () => {
     if (!selectedProvider) return;
     const cfg = getConfig(selectedProvider);
+
+    // 私有部署：若无 API Key 但有 API Base，直接标记为有效
+    if (selectedProvider === 'private' && !cfg.api_key.trim()) {
+      if (!cfg.api_base?.trim()) {
+        message.warning('请先填写 API Base URL');
+        return;
+      }
+      setValidationStatus('valid');
+      setValidationMsg('私有部署无需验证');
+      return;
+    }
+
     if (!cfg.api_key.trim()) {
       message.warning('请先输入 API Key');
       return;
@@ -317,23 +332,29 @@ export default function ModelConfigForm() {
     const cfg = getConfig(selectedProvider);
     const catalog = PLATFORM_CATALOG[selectedProvider];
 
-    if (!cfg.api_key.trim()) {
-      message.warning('请输入 API Key');
-      return;
-    }
-
-    // 必须先验证或已验证有效
-    if (validationStatus === 'idle') {
-      message.warning('请先验证 API Key 有效性');
-      return;
-    }
-    if (validationStatus === 'invalid') {
-      message.error('API Key 无效，请更正后重试');
-      return;
-    }
-    if (validationStatus === 'validating') {
-      message.warning('正在验证中，请稍候');
-      return;
+    // 私有部署：API Key 可选，API Base 必填，无需验证
+    if (selectedProvider === 'private') {
+      if (!cfg.api_base?.trim()) {
+        message.warning('私有部署需要填写 API Base URL');
+        return;
+      }
+    } else {
+      if (!cfg.api_key.trim()) {
+        message.warning('请输入 API Key');
+        return;
+      }
+      if (validationStatus === 'idle') {
+        message.warning('请先验证 API Key 有效性');
+        return;
+      }
+      if (validationStatus === 'invalid') {
+        message.error('API Key 无效，请更正后重试');
+        return;
+      }
+      if (validationStatus === 'validating') {
+        message.warning('正在验证中，请稍候');
+        return;
+      }
     }
 
     setSaving(true);
@@ -521,7 +542,11 @@ export default function ModelConfigForm() {
           {/* API Key */}
           <div className="mb-4">
             <Text strong className="block mb-1">
-              API Key <Text type="danger">*</Text>
+              API Key{' '}
+              {selectedProvider === 'private'
+                ? <Text type="secondary">（可选）</Text>
+                : <Text type="danger">*</Text>
+              }
             </Text>
             <Space.Compact style={{ width: '100%' }}>
               <Input.Password
@@ -637,8 +662,19 @@ export default function ModelConfigForm() {
             );
           })()}
 
-          {/* 自定义 API Base（可折叠） */}
-          {currentCatalog.needsApiBase && (
+          {/* 自定义 API Base（私有部署必填，其他平台可折叠） */}
+          {selectedProvider === 'private' ? (
+            <div className="mb-4">
+              <Text strong className="block mb-1">
+                API Base URL <Text type="danger">*</Text>
+              </Text>
+              <Input
+                value={currentConfig.api_base}
+                onChange={e => updateConfig(selectedProvider, { api_base: e.target.value })}
+                placeholder="例如：http://localhost:11434/v1"
+              />
+            </div>
+          ) : currentCatalog.needsApiBase ? (
             <Collapse
               ghost
               size="small"
@@ -657,7 +693,7 @@ export default function ModelConfigForm() {
                 },
               ]}
             />
-          )}
+          ) : null}
 
           <Divider style={{ margin: '12px 0' }} />
 
