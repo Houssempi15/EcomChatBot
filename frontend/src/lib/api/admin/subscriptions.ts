@@ -24,7 +24,7 @@ interface SubscriptionPlan {
 export const adminSubscriptionsApi = {
   list: async (params: ListSubscriptionsParams): Promise<ApiResponse<PaginatedResponse<SubscriptionInfo>>> => {
     const response = await adminApiClient.get<ApiResponse<PaginatedResponse<SubscriptionInfo>>>(
-      '/subscriptions',
+      '/admin/subscriptions',
       { params }
     );
     return response.data;
@@ -32,7 +32,7 @@ export const adminSubscriptionsApi = {
 
   assignPlan: async (tenantId: string, data: AssignPlanParams): Promise<ApiResponse<SubscriptionInfo>> => {
     const response = await adminApiClient.post<ApiResponse<SubscriptionInfo>>(
-      `/tenants/${tenantId}/assign-plan`,
+      `/admin/tenants/${tenantId}/assign-plan`,
       data
     );
     return response.data;
@@ -40,14 +40,14 @@ export const adminSubscriptionsApi = {
 
   getPlans: async (): Promise<ApiResponse<{ plans: Record<string, SubscriptionPlan> }>> => {
     const response = await adminApiClient.get<ApiResponse<{ plans: Record<string, SubscriptionPlan> }>>(
-      '/subscriptions/plans'
+      '/admin/subscriptions/plans'
     );
     return response.data;
   },
 
   getTenantSubscription: async (tenantId: string): Promise<ApiResponse<SubscriptionInfo>> => {
     const response = await adminApiClient.get<ApiResponse<SubscriptionInfo>>(
-      `/tenants/${tenantId}/subscription`
+      `/admin/tenants/${tenantId}/subscription`
     );
     return response.data;
   },
