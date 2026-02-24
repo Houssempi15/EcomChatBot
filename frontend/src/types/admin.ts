@@ -153,11 +153,18 @@ export interface SubscriptionInfo {
   id: number;
   subscription_id: string;
   tenant_id: string;
+  company_name?: string;
   plan_type: string;
   status: SubscriptionStatus;
   start_date: string;
   end_date: string;
+  expire_at: string;
   auto_renew: boolean;
+  is_trial?: boolean;
+  conversation_quota?: number;
+  api_quota?: number;
+  storage_quota?: number;
+  concurrent_quota?: number;
   created_at: string;
   updated_at: string;
 }
