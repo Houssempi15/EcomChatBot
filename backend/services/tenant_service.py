@@ -152,9 +152,7 @@ class TenantService:
         api_key = generate_api_key()
         api_key_hash = hash_api_key(api_key)
         api_key_prefix = api_key[:12] if len(api_key) >= 12 else api_key  # 保存前缀用于快速查找
-        # 为管理员创建的租户生成默认密码
-        default_password = generate_api_key()  # 使用API Key格式作为临时密码
-        password_hash = hash_password(default_password)
+        password_hash = hash_password(tenant_data.password)
 
         # 创建租户
         tenant = Tenant(
