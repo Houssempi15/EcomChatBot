@@ -8,7 +8,7 @@ echo ""
 
 # 等待 PostgreSQL
 echo "📦 检查 PostgreSQL..."
-until pg_isready -h postgres -U ecom_user > /dev/null 2>&1; do
+until pg_isready -h postgres -U ecom_user -d ecom_chatbot > /dev/null 2>&1; do
   echo "  PostgreSQL 未就绪，等待..."
   sleep 2
 done
