@@ -25,7 +25,7 @@ from schemas import (
     SubscriptionOperationResponse,
 )
 from services import SubscriptionService, TenantService, UsageService
-from services.payment_service import PaymentService, PLAN_PRICES
+from services.payment_service import PaymentService, PLAN_CONFIG
 from models.payment import PaymentType, SubscriptionType
 
 router = APIRouter(prefix="/tenant", tags=["租户管理"])
@@ -216,35 +216,19 @@ async def subscribe_plan(
 
     # 付费套餐：创建支付订单
     payment_service = PaymentService(db)
-
-    # 根据支付方式选择支付类型
-    if request.payment_method == "wechat":
-        # 微信支付
-        order, payment_data = await payment_service.create_wechat_payment_order(
-            tenant_id=tenant.id,
-            plan_type=request.plan_type,
-            duration_months=request.duration_months,
-            payment_method="native",  # 默认扫码支付
-            subscription_type=SubscriptionType.NEW,
-            description=f"{request.plan_type}套餐订阅-{request.duration_months}个月",
-        )
-        payment_url = payment_data.get("code_url", "")
-    else:
-        # 支付宝支付（默认）
-        order, payment_html = await payment_service.create_payment_order(
-            tenant_id=tenant.id,
-            plan_type=request.plan_type,
-            duration_months=request.duration_months,
-            payment_type=PaymentType.PC,
-            subscription_type=SubscriptionType.NEW,
-            description=f"{request.plan_type}套餐订阅-{request.duration_months}个月",
-        )
-        payment_url = payment_html  # 支付宝返回的是HTML表单
+    channel = "wechat" if request.payment_method == "wechat" else "alipay"
+    order, qr_url = await payment_service.create_native_payment_order(
+        tenant_id=tenant.id,
+        plan_type=request.plan_type,
+        payment_channel=channel,
+        subscription_type=SubscriptionType.NEW,
+        description=f"{request.plan_type}套餐订阅",
+    )
 
     return ApiResponse(
         data=SubscriptionOperationResponse(
             success=True,
-            message="订单创建成功，请完成支付",
+            message="订单创建成功，请扫码完成支付",
             order_number=order.order_number,
             payment_required=True,
             payment_amount=order.amount,
@@ -294,9 +278,9 @@ async def change_plan(
             detail="新套餐与当前套餐相同"
         )
 
-    # 获取套餐价格
-    current_price = PLAN_PRICES.get(current_plan, Decimal("0"))
-    new_price = PLAN_PRICES.get(request.new_plan_type, Decimal("0"))
+    # 获取套餐价格（用于判断升降级）
+    current_price = PLAN_CONFIG.get(current_plan, (Decimal("0"), 0))[0]
+    new_price = PLAN_CONFIG.get(request.new_plan_type, (Decimal("0"), 0))[0]
 
     # 判断是升级还是降级
     is_upgrade = new_price > current_price
@@ -312,11 +296,10 @@ async def change_plan(
 
         if prorated_charge > 0:
             # 需要补差价，创建支付订单
-            order, payment_html = await payment_service.create_payment_order(
+            order, qr_url = await payment_service.create_native_payment_order(
                 tenant_id=tenant.id,
                 plan_type=request.new_plan_type,
-                duration_months=1,  # 差价订单
-                payment_type=PaymentType.PC,
+                payment_channel="wechat",
                 subscription_type=SubscriptionType.UPGRADE,
                 description=f"套餐升级: {current_plan} -> {request.new_plan_type}",
             )

@@ -176,43 +176,29 @@ async def sync_pending_orders() -> Dict[str, Any]:
             }
 
             # 3. 处理待支付订单
-            from services.alipay_client import get_alipay_client
-            from services.wechat_pay import WechatPayClient, WechatPayConfig
             from services.payment_service import PaymentService
             from models.payment import PaymentChannel
 
-            alipay_client = get_alipay_client()
             payment_service = PaymentService(db)
 
             for order in pending_orders:
                 try:
-                    trade_status = None
-                    trade_no = None
-
-                    if order.payment_channel == PaymentChannel.ALIPAY:
-                        # 查询支付宝订单状态
-                        query_result = alipay_client.query_order(
-                            order_number=order.order_number
-                        )
-                        if query_result:
-                            trade_status = query_result.get("trade_status")
-                            trade_no = query_result.get("trade_no")
-
-                    elif order.payment_channel == PaymentChannel.WECHAT:
-                        # 查询微信订单状态
-                        if payment_service.wechat_client:
-                            query_result = await payment_service.wechat_client.query_order(
-                                order.order_number
+                    # 通过统一网关查询订单状态
+                    channel = "wechat" if order.payment_channel == PaymentChannel.WECHAT else "alipay"
+                    gw_result = None
+                    if payment_service._gateway:
+                        try:
+                            gw_result = await payment_service._gateway.query_order(
+                                order.order_number, channel
                             )
-                            if query_result:
-                                trade_status = query_result.get("trade_state")
-                                trade_no = query_result.get("transaction_id")
+                        except Exception as qe:
+                            logger.warning(f"网关查询失败 ({order.order_number}): {qe}")
 
                     # 根据查询结果更新订单
-                    if trade_status in ["TRADE_SUCCESS", "SUCCESS"]:
+                    if gw_result and gw_result.get("paid"):
                         # 支付成功
                         order.status = OrderStatus.PAID
-                        order.trade_no = trade_no
+                        order.trade_no = gw_result.get("trade_no")
                         order.paid_at = datetime.utcnow()
 
                         # 激活订阅
@@ -220,12 +206,6 @@ async def sync_pending_orders() -> Dict[str, Any]:
 
                         stats["paid_orders"] += 1
                         logger.info(f"订单同步-支付成功: {order.order_number}")
-
-                    elif trade_status in ["TRADE_CLOSED", "CLOSED"]:
-                        # 订单已关闭
-                        order.status = OrderStatus.CANCELLED
-                        stats["closed_orders"] += 1
-                        logger.info(f"订单同步-已关闭: {order.order_number}")
 
                     stats["synced_orders"] += 1
 
