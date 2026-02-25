@@ -9,7 +9,7 @@ import sqlalchemy as sa
 
 
 revision = "010"
-down_revision = "009"
+down_revision = "009_add_subscription_uuid"
 branch_labels = None
 depends_on = None
 
