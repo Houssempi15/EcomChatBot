@@ -64,4 +64,15 @@ export const conversationApi = {
     );
     return response.data;
   },
+
+  takeover: async (
+    conversationId: string,
+    reason?: string
+  ): Promise<ApiResponse<Conversation>> => {
+    const response = await apiClient.put<ApiResponse<Conversation>>(
+      `/conversation/${conversationId}/takeover`,
+      { reason }
+    );
+    return response.data;
+  },
 };

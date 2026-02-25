@@ -83,7 +83,7 @@ class ConversationCreate(BaseSchema):
 class ConversationUpdate(BaseSchema):
     """更新会话"""
 
-    status: str | None = Field(None, pattern="^(active|closed)$", description="状态")
+    status: str | None = Field(None, pattern="^(active|waiting|closed)$", description="状态")
     satisfaction_score: int | None = Field(None, ge=1, le=5, description="满意度评分")
     feedback: str | None = Field(None, description="用户反馈")
 

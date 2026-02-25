@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect } from 'react';
-import { Button, Input, Tag, Typography, Spin, Empty } from 'antd';
+import { Button, Input, Tag, Typography, Spin, Empty, Badge } from 'antd';
 import { SendOutlined } from '@ant-design/icons';
 import MessageBubble from './MessageBubble';
 import { Message, ConversationDetail } from '@/types';
@@ -19,6 +19,7 @@ interface ChatWindowProps {
   onTakeover: () => void;
   sending?: boolean;
   loading?: boolean;
+  wsConnected?: boolean;
 }
 
 export default function ChatWindow({
@@ -31,6 +32,7 @@ export default function ChatWindow({
   onTakeover,
   sending = false,
   loading = false,
+  wsConnected = false,
 }: ChatWindowProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -58,21 +60,33 @@ export default function ChatWindow({
     );
   }
 
+  const isClosed = conversation.status === 'closed';
+  const isWaiting = conversation.status === 'waiting';
+  const inputDisabled = isClosed;
+
   return (
     <div className="flex-1 flex flex-col bg-gray-50">
       {/* Header */}
       <div className="h-16 px-5 flex items-center justify-between bg-white border-b border-gray-200">
         <div className="flex items-center gap-3">
           <Text strong>{formatUserId(conversation.user_external_id)}</Text>
-          <Tag color={conversation.status === 'active' ? 'green' : 'default'}>
-            {conversation.status === 'active' ? '在线' : '离线'}
-          </Tag>
+          {isWaiting ? (
+            <Tag color="orange">人工接管中</Tag>
+          ) : (
+            <Tag color={conversation.status === 'active' ? 'green' : 'default'}>
+              {conversation.status === 'active' ? '在线' : '离线'}
+            </Tag>
+          )}
+          <Badge
+            status={wsConnected ? 'success' : 'default'}
+            text={<Text type="secondary" className="text-xs">{wsConnected ? 'WS已连接' : 'WS未连接'}</Text>}
+          />
         </div>
         <div className="flex gap-2">
-          <Button danger onClick={onClose}>
+          <Button danger onClick={onClose} disabled={isClosed}>
             结束会话
           </Button>
-          <Button type="primary" onClick={onTakeover}>
+          <Button type="primary" onClick={onTakeover} disabled={isWaiting || isClosed}>
             人工接管
           </Button>
         </div>
@@ -100,9 +114,10 @@ export default function ChatWindow({
           value={inputValue}
           onChange={(e) => onInputChange(e.target.value)}
           onKeyPress={handleKeyPress}
-          placeholder="输入回复内容..."
+          placeholder={isClosed ? '会话已结束' : '输入回复内容...'}
           autoSize={{ minRows: 3, maxRows: 6 }}
           className="mb-3"
+          disabled={inputDisabled}
         />
         <div className="flex items-center justify-between">
           <Text type="secondary" className="text-sm">
@@ -113,7 +128,7 @@ export default function ChatWindow({
             icon={<SendOutlined />}
             onClick={onSend}
             loading={sending}
-            disabled={!inputValue.trim()}
+            disabled={!inputValue.trim() || inputDisabled}
           >
             发送
           </Button>

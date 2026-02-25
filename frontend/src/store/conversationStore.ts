@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { conversationApi } from '@/lib/api';
-import { Conversation, ConversationDetail, Message } from '@/types';
+import { Conversation, ConversationDetail, Message, KnowledgeSearchResult } from '@/types';
+
+type StatusFilter = 'all' | 'active' | 'waiting' | 'closed';
+type WsStatus = 'disconnected' | 'connecting' | 'connected';
 
 interface ConversationState {
   conversations: Conversation[];
@@ -14,6 +17,10 @@ interface ConversationState {
     total: number;
     pages: number;
   };
+  statusFilter: StatusFilter;
+  wsStatus: WsStatus;
+  streamingMessageId: string | null;
+  ragSources: KnowledgeSearchResult[];
 
   fetchConversations: (params?: { status?: string; page?: number }) => Promise<void>;
   fetchConversation: (conversationId: string) => Promise<void>;
@@ -22,6 +29,14 @@ interface ConversationState {
   updateMessage: (messageId: string, content: string) => void;
   closeConversation: (conversationId: string) => Promise<void>;
   clearCurrentConversation: () => void;
+  setStatusFilter: (status: StatusFilter) => void;
+  setWsStatus: (status: WsStatus) => void;
+  startStreamingMessage: (conversationId: string) => string;
+  appendStreamChunk: (tempId: string, chunk: string) => void;
+  finalizeStreamingMessage: (tempId: string) => void;
+  setRagSources: (sources: KnowledgeSearchResult[]) => void;
+  takeoverConversation: (conversationId: string, reason?: string) => Promise<void>;
+  updateConversationInList: (conversationId: string, updates: Partial<Conversation>) => void;
 }
 
 export const useConversationStore = create<ConversationState>((set, get) => ({
@@ -36,14 +51,20 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
     total: 0,
     pages: 0,
   },
+  statusFilter: 'all',
+  wsStatus: 'disconnected',
+  streamingMessageId: null,
+  ragSources: [],
 
   fetchConversations: async (params) => {
     set({ isLoading: true, error: null });
     try {
+      const { statusFilter, pagination } = get();
+      const statusParam = params?.status ?? (statusFilter !== 'all' ? statusFilter : undefined);
       const response = await conversationApi.list({
-        page: params?.page || get().pagination.page,
-        size: get().pagination.size,
-        status: params?.status,
+        page: params?.page || pagination.page,
+        size: pagination.size,
+        status: statusParam,
       });
 
       if (response.success && response.data) {
@@ -58,16 +79,10 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
           isLoading: false,
         });
       } else {
-        set({
-          error: response.error?.message || '加载会话列表失败',
-          isLoading: false,
-        });
+        set({ error: response.error?.message || '加载会话列表失败', isLoading: false });
       }
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : '加载会话列表失败',
-        isLoading: false,
-      });
+      set({ error: error instanceof Error ? error.message : '加载会话列表失败', isLoading: false });
     }
   },
 
@@ -82,16 +97,10 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
           isLoading: false,
         });
       } else {
-        set({
-          error: response.error?.message || '加载会话详情失败',
-          isLoading: false,
-        });
+        set({ error: response.error?.message || '加载会话详情失败', isLoading: false });
       }
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : '加载会话详情失败',
-        isLoading: false,
-      });
+      set({ error: error instanceof Error ? error.message : '加载会话详情失败', isLoading: false });
     }
   },
 
@@ -100,9 +109,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   },
 
   addMessage: (message: Message) => {
-    set((state) => ({
-      messages: [...state.messages, message],
-    }));
+    set((state) => ({ messages: [...state.messages, message] }));
   },
 
   updateMessage: (messageId: string, content: string) => {
@@ -119,13 +126,12 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       if (response.success) {
         set((state) => ({
           conversations: state.conversations.map((conv) =>
-            conv.conversation_id === conversationId
-              ? { ...conv, status: 'closed' as const }
-              : conv
+            conv.conversation_id === conversationId ? { ...conv, status: 'closed' as const } : conv
           ),
-          currentConversation: state.currentConversation?.conversation_id === conversationId
-            ? { ...state.currentConversation, status: 'closed' as const }
-            : state.currentConversation,
+          currentConversation:
+            state.currentConversation?.conversation_id === conversationId
+              ? { ...state.currentConversation, status: 'closed' as const }
+              : state.currentConversation,
         }));
       }
     } catch (error) {
@@ -135,5 +141,81 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
 
   clearCurrentConversation: () => {
     set({ currentConversation: null, messages: [] });
+  },
+
+  setStatusFilter: (status: StatusFilter) => {
+    set({ statusFilter: status });
+  },
+
+  setWsStatus: (status: WsStatus) => {
+    set({ wsStatus: status });
+  },
+
+  startStreamingMessage: (conversationId: string) => {
+    const tempId = `stream-${Date.now()}`;
+    const placeholder: Message = {
+      id: Date.now(),
+      message_id: tempId,
+      conversation_id: conversationId,
+      role: 'assistant',
+      content: '',
+      created_at: new Date().toISOString(),
+      input_tokens: 0,
+      output_tokens: 0,
+      isStreaming: true,
+    };
+    set((state) => ({
+      messages: [...state.messages, placeholder],
+      streamingMessageId: tempId,
+    }));
+    return tempId;
+  },
+
+  appendStreamChunk: (tempId: string, chunk: string) => {
+    set((state) => ({
+      messages: state.messages.map((msg) =>
+        msg.message_id === tempId ? { ...msg, content: msg.content + chunk } : msg
+      ),
+    }));
+  },
+
+  finalizeStreamingMessage: (tempId: string) => {
+    set((state) => ({
+      messages: state.messages.map((msg) =>
+        msg.message_id === tempId ? { ...msg, isStreaming: false } : msg
+      ),
+      streamingMessageId: null,
+    }));
+  },
+
+  setRagSources: (sources: KnowledgeSearchResult[]) => {
+    set({ ragSources: sources });
+  },
+
+  takeoverConversation: async (conversationId: string, reason?: string) => {
+    try {
+      const response = await conversationApi.takeover(conversationId, reason);
+      if (response.success) {
+        set((state) => ({
+          conversations: state.conversations.map((conv) =>
+            conv.conversation_id === conversationId ? { ...conv, status: 'waiting' as const } : conv
+          ),
+          currentConversation:
+            state.currentConversation?.conversation_id === conversationId
+              ? { ...state.currentConversation, status: 'waiting' as const }
+              : state.currentConversation,
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to takeover conversation:', error);
+    }
+  },
+
+  updateConversationInList: (conversationId: string, updates: Partial<Conversation>) => {
+    set((state) => ({
+      conversations: state.conversations.map((conv) =>
+        conv.conversation_id === conversationId ? { ...conv, ...updates } : conv
+      ),
+    }));
   },
 }));

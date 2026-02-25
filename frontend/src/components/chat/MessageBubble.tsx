@@ -21,6 +21,7 @@ function renderContent(content: string) {
 export default function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
+  const isStreaming = message.isStreaming === true;
 
   const formatTime = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -53,12 +54,17 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
       >
         <div className="text-sm leading-relaxed" style={{ color: '#1E1B4B' }}>
           {renderContent(message.content)}
+          {isStreaming && (
+            <span className="inline-block w-0.5 h-4 bg-indigo-500 ml-0.5 animate-pulse align-middle" />
+          )}
         </div>
-        <div className={`text-xs mt-2 ${isUser ? 'text-left' : 'text-right'}`}>
-          <Text type="secondary" style={{ fontSize: '0.7rem' }}>
-            {formatTime(message.created_at)}
-          </Text>
-        </div>
+        {!isStreaming && (
+          <div className={`text-xs mt-2 ${isUser ? 'text-left' : 'text-right'}`}>
+            <Text type="secondary" style={{ fontSize: '0.7rem' }}>
+              {formatTime(message.created_at)}
+            </Text>
+          </div>
+        )}
       </div>
     </div>
   );

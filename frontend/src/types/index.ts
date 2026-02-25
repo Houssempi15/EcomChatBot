@@ -102,6 +102,7 @@ export interface Message {
   created_at: string;
   input_tokens: number;
   output_tokens: number;
+  isStreaming?: boolean;
 }
 
 export interface ConversationCreateRequest {
@@ -171,6 +172,8 @@ export interface WSMessage {
   type: 'message' | 'stream' | 'system' | 'error' | 'metadata' | 'pong';
   role?: 'user' | 'assistant';
   content?: string;
+  chunk?: string;
+  is_final?: boolean;
   timestamp?: string;
   tokens?: {
     input: number;

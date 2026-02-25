@@ -2,6 +2,7 @@
 对话管理 API 路由
 """
 from fastapi import APIRouter, Query
+from pydantic import BaseModel
 
 from api.dependencies import DBDep, TenantDep, TenantFlexDep
 from api.middleware import ConcurrentQuotaDep, ConversationQuotaDep
@@ -182,3 +183,29 @@ async def get_messages(
     service = ConversationService(db, tenant_id)
     messages = await service.get_messages(conversation_id, limit=limit)
     return ApiResponse(data=messages)
+
+
+class TakeoverRequest(BaseModel):
+    reason: str | None = None
+
+
+@router.put(
+    "/{conversation_id}/takeover",
+    response_model=ApiResponse[ConversationResponse],
+)
+async def takeover_conversation(
+    conversation_id: str,
+    data: TakeoverRequest,
+    tenant_id: TenantFlexDep,
+    db: DBDep,
+):
+    """人工接管会话"""
+    service = ConversationService(db, tenant_id)
+    conversation = await service.get_conversation(conversation_id)
+    conversation.status = "waiting"
+    conversation.transferred_to_human = True
+    if data.reason:
+        conversation.transfer_reason = data.reason
+    await db.commit()
+    await db.refresh(conversation)
+    return ApiResponse(data=conversation)

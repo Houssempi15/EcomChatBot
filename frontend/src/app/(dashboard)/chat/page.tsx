@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { message, Spin } from 'antd';
 import {
@@ -9,81 +9,114 @@ import {
   RightPanel,
 } from '@/components/chat';
 import { conversationApi } from '@/lib/api';
-import {
-  Conversation,
-  ConversationDetail,
-  Message,
-  User,
-  KnowledgeSearchResult,
-} from '@/types';
+import { useConversationStore } from '@/store/conversationStore';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import { Message } from '@/types';
 
 export default function ChatPage() {
   const searchParams = useSearchParams();
   const initialId = searchParams.get('id');
 
-  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(initialId);
-  const [currentConversation, setCurrentConversation] = useState<ConversationDetail | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [searchValue, setSearchValue] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [conversationLoading, setConversationLoading] = useState(false);
   const [sending, setSending] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [ragSources, setRagSources] = useState<KnowledgeSearchResult[]>([]);
 
-  // Load conversations list
-  const loadConversations = useCallback(async () => {
-    try {
-      const response = await conversationApi.list({ page: 1, size: 50 });
-      if (response.success && response.data) {
-        setConversations(response.data.items || []);
-      }
-    } catch (err) {
-      console.error('Failed to load conversations:', err);
-      message.error('加载会话列表失败');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const {
+    conversations,
+    currentConversation,
+    messages,
+    isLoading,
+    pagination,
+    statusFilter,
+    wsStatus,
+    ragSources,
+    fetchConversations,
+    selectConversation,
+    addMessage,
+    closeConversation,
+    setStatusFilter,
+    setWsStatus,
+    startStreamingMessage,
+    appendStreamChunk,
+    finalizeStreamingMessage,
+    setRagSources,
+    takeoverConversation,
+  } = useConversationStore();
 
+  const streamingIdRef = useRef<string | null>(null);
+
+  // Initial load + 30s polling
   useEffect(() => {
-    loadConversations();
-  }, [loadConversations]);
+    fetchConversations();
+    const timer = setInterval(() => fetchConversations(), 30000);
+    return () => clearInterval(timer);
+  }, [fetchConversations]);
 
-  // Load conversation details when selected
+  // Re-fetch when filter changes
   useEffect(() => {
-    if (!selectedId) {
-      setCurrentConversation(null);
-      setMessages([]);
-      setUser(null);
+    fetchConversations({ page: 1 });
+  }, [statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load conversation detail when selected
+  useEffect(() => {
+    if (selectedId) {
+      selectConversation(selectedId);
       setRagSources([]);
-      return;
     }
+  }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const loadConversationDetail = async () => {
-      setConversationLoading(true);
-      try {
-        const response = await conversationApi.get(selectedId);
-        if (response.success && response.data) {
-          const detail = response.data;
-          setCurrentConversation(detail);
-          setMessages(detail.messages || []);
-          setUser(detail.user || null);
-          // TODO: Load RAG sources if available
-          setRagSources([]);
+  // WebSocket
+  const { isConnected, sendMessage: wsSend } = useWebSocket({
+    conversationId: selectedId || '',
+    stream: true,
+    autoConnect: !!selectedId,
+    onConnect: () => setWsStatus('connected'),
+    onDisconnect: () => setWsStatus('disconnected'),
+    onMessage: (msg) => {
+      if (msg.type === 'stream') {
+        const chunk = msg.chunk ?? msg.content ?? '';
+        if (!streamingIdRef.current) {
+          streamingIdRef.current = startStreamingMessage(selectedId!);
         }
-      } catch (err) {
-        console.error('Failed to load conversation:', err);
-        message.error('加载会话详情失败');
-      } finally {
-        setConversationLoading(false);
+        appendStreamChunk(streamingIdRef.current, chunk);
+        if (msg.is_final) {
+          finalizeStreamingMessage(streamingIdRef.current);
+          streamingIdRef.current = null;
+        }
+      } else if (msg.type === 'message') {
+        if (streamingIdRef.current) {
+          finalizeStreamingMessage(streamingIdRef.current);
+          streamingIdRef.current = null;
+        }
+        if (msg.role === 'assistant' && msg.content) {
+          const newMsg: Message = {
+            id: Date.now(),
+            message_id: `ws-${Date.now()}`,
+            conversation_id: selectedId!,
+            role: 'assistant',
+            content: msg.content,
+            created_at: msg.timestamp || new Date().toISOString(),
+            input_tokens: msg.tokens?.input || 0,
+            output_tokens: msg.tokens?.output || 0,
+          };
+          addMessage(newMsg);
+        }
+      } else if (msg.type === 'metadata' && msg.sources) {
+        setRagSources(
+          msg.sources.map((s) => ({
+            knowledge_id: s.knowledge_id,
+            title: s.title,
+            content: '',
+            score: s.score,
+            source: s.title,
+          }))
+        );
+      } else if (msg.type === 'error') {
+        message.error(msg.content || '消息处理出错');
       }
-    };
-
-    loadConversationDetail();
-  }, [selectedId]);
+    },
+  });
 
   const handleSelectConversation = (id: string) => {
     setSelectedId(id);
@@ -92,7 +125,7 @@ export default function ChatPage() {
   const handleSendMessage = async () => {
     if (!inputValue.trim() || !selectedId) return;
 
-    const userMessage: Message = {
+    const userMsg: Message = {
       id: Date.now(),
       message_id: `msg-${Date.now()}`,
       conversation_id: selectedId,
@@ -102,69 +135,61 @@ export default function ChatPage() {
       input_tokens: 0,
       output_tokens: 0,
     };
-
-    setMessages((prev) => [...prev, userMessage]);
+    addMessage(userMsg);
+    const content = inputValue;
     setInputValue('');
-    setSending(true);
 
-    try {
-      const response = await conversationApi.sendMessage(selectedId, {
-        content: inputValue,
-      });
-
-      if (response.success && response.data) {
-        // Add the AI response
-        setMessages((prev) => [...prev, response.data as Message]);
-      } else {
-        message.error(response.error?.message || '发送失败');
+    if (currentConversation?.status === 'waiting') {
+      // Human takeover mode: use REST
+      setSending(true);
+      try {
+        const response = await conversationApi.sendMessage(selectedId, { content });
+        if (!response.success) {
+          message.error(response.error?.message || '发送失败');
+        }
+      } catch {
+        message.error('发送消息失败');
+      } finally {
+        setSending(false);
       }
-    } catch (err) {
-      console.error('Failed to send message:', err);
-      message.error('发送消息失败');
-    } finally {
-      setSending(false);
+    } else {
+      // AI mode: use WebSocket
+      wsSend(content);
     }
   };
 
   const handleCloseConversation = async () => {
     if (!selectedId) return;
-
-    try {
-      const response = await conversationApi.close(selectedId);
-      if (response.success) {
-        // Update conversation status in list
-        setConversations((prev) =>
-          prev.map((c) =>
-            c.conversation_id === selectedId ? { ...c, status: 'closed' as const } : c
-          )
-        );
-        if (currentConversation) {
-          setCurrentConversation({ ...currentConversation, status: 'closed' });
-        }
-        message.success('会话已结束');
-      }
-    } catch (err) {
-      console.error('Failed to close conversation:', err);
-      message.error('关闭会话失败');
-    }
+    await closeConversation(selectedId);
+    message.success('会话已结束');
   };
 
-  const handleTakeover = () => {
-    message.info('已接管会话，切换至人工模式');
+  const handleTakeover = async () => {
+    if (!selectedId) return;
+    await takeoverConversation(selectedId);
+    message.success('已接管会话，切换至人工模式');
   };
 
-  // Filter conversations by search
+  const handleStatusFilterChange = (status: 'all' | 'active' | 'waiting' | 'closed') => {
+    setStatusFilter(status);
+  };
+
+  const handlePageChange = (page: number) => {
+    fetchConversations({ page });
+  };
+
+  // Filter by search locally
   const filteredConversations = conversations.filter((c) => {
     if (!searchValue) return true;
-    const search = searchValue.toLowerCase();
+    const s = searchValue.toLowerCase();
     return (
-      c.conversation_id.toLowerCase().includes(search) ||
-      c.user_external_id.toLowerCase().includes(search) ||
-      c.last_message_preview?.toLowerCase().includes(search)
+      c.conversation_id.toLowerCase().includes(s) ||
+      c.user_external_id.toLowerCase().includes(s) ||
+      c.last_message_preview?.toLowerCase().includes(s)
     );
   });
 
-  if (loading) {
+  if (isLoading && conversations.length === 0) {
     return (
       <div className="h-[calc(100vh-64px-48px)] flex items-center justify-center">
         <Spin size="large" tip="加载中..." />
@@ -182,6 +207,11 @@ export default function ChatPage() {
           onSelect={handleSelectConversation}
           searchValue={searchValue}
           onSearchChange={setSearchValue}
+          statusFilter={statusFilter}
+          onStatusFilterChange={handleStatusFilterChange}
+          pagination={pagination}
+          onPageChange={handlePageChange}
+          loading={isLoading}
         />
       </div>
 
@@ -195,11 +225,12 @@ export default function ChatPage() {
         onClose={handleCloseConversation}
         onTakeover={handleTakeover}
         sending={sending}
-        loading={conversationLoading}
+        loading={isLoading && !!selectedId && !currentConversation}
+        wsConnected={isConnected}
       />
 
       {/* Right Panel */}
-      <RightPanel user={user} ragSources={ragSources} />
+      <RightPanel user={currentConversation?.user || null} ragSources={ragSources} />
     </div>
   );
 }
