@@ -303,9 +303,11 @@ class RAGService:
             vectors.append(vector)
 
         # 4. 批量插入 Milvus
+        dim = len(vectors[0]) if vectors else None
         await self.milvus_service.insert_vectors(
             knowledge_items=knowledge_items,
             vectors=vectors,
+            dimension=dim,
         )
 
         # 5. 更新 DB 记录的向量 ID 和模型名称

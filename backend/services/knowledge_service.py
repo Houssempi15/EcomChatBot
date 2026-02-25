@@ -295,13 +295,37 @@ class KnowledgeService:
         return knowledge
 
     async def delete_knowledge(self, knowledge_id: str) -> None:
-        """删除知识条目（软删除）"""
+        """删除知识条目：软删除 DB + 清理 Milvus 向量"""
         knowledge = await self.get_knowledge(knowledge_id)
         knowledge.status = "inactive"
         await self.db.commit()
 
-        # TODO: 从 Milvus 删除向量
-        # await self.delete_embedding(knowledge)
+        # 删除 Milvus 向量
+        ks = await self.get_settings()
+        if ks.embedding_model_id:
+            from models.model_config import ModelConfig
+            from services.rag_service import RAGService
+            from services.milvus_service import MilvusService
+            result = await self.db.execute(
+                select(ModelConfig).where(ModelConfig.id == ks.embedding_model_id)
+            )
+            model_config = result.scalar_one_or_none()
+            if model_config:
+                rag = RAGService(self.db, self.tenant_id, embedding_model_config=model_config)
+                await rag.delete_knowledge_vectors([knowledge_id])
+
+                # 检查是否还有 active 文档
+                count_result = await self.db.execute(
+                    select(func.count()).where(
+                        and_(
+                            KnowledgeBase.tenant_id == self.tenant_id,
+                            KnowledgeBase.status == "active",
+                        )
+                    )
+                )
+                remaining = count_result.scalar()
+                if remaining == 0:
+                    MilvusService(self.tenant_id).drop_tenant_partition()
 
     async def search_knowledge(
         self,

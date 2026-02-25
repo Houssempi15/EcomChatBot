@@ -179,6 +179,11 @@ class EmbeddingService:
         vectors = await self.embeddings.aembed_documents(texts)
         return vectors
 
+    async def get_dimension_from_model(self) -> int:
+        """通过实际调用 embedding 模型获取向量维度"""
+        vector = await self.embed_text("test")
+        return len(vector)
+
     def get_dimension(self) -> int:
         """
         获取向量维度

@@ -45,13 +45,17 @@ class MilvusService:
             print(f"✗ 连接 Milvus 失败: {e}")
             raise
 
-    def create_collection_if_not_exists(self) -> Collection:
+    def create_collection_if_not_exists(self, dimension: int | None = None) -> Collection:
         """
         创建 Collection（如果不存在）
-        
+
+        Args:
+            dimension: 向量维度；为 None 时回退到 settings.embedding_dimension
+
         Returns:
             Collection 实例
         """
+        dim = dimension or settings.embedding_dimension
         # 检查是否存在
         if utility.has_collection(self.COLLECTION_NAME):
             collection = Collection(self.COLLECTION_NAME)
@@ -88,7 +92,7 @@ class MilvusService:
             FieldSchema(
                 name="vector",
                 dtype=DataType.FLOAT_VECTOR,
-                dim=settings.embedding_dimension,
+                dim=dim,
             ),
         ]
 
@@ -128,18 +132,20 @@ class MilvusService:
         self,
         knowledge_items: list[dict[str, Any]],
         vectors: list[list[float]],
+        dimension: int | None = None,
     ) -> list[str]:
         """
         插入向量
-        
+
         Args:
             knowledge_items: 知识库项列表
             vectors: 对应的向量列表
-            
+            dimension: 向量维度（用于首次创建 collection）
+
         Returns:
             插入的 ID 列表
         """
-        collection = self.create_collection_if_not_exists()
+        collection = self.create_collection_if_not_exists(dimension=dimension)
 
         # 准备数据
         ids = [item["id"] for item in knowledge_items]
@@ -242,6 +248,19 @@ class MilvusService:
 
         print(f"✓ 删除 {len(knowledge_ids)} 条向量")
         return len(knowledge_ids)
+
+    def drop_tenant_partition(self) -> None:
+        """删除当前租户分区；若 collection 无其他分区则删除整个 collection"""
+        if not utility.has_collection(self.COLLECTION_NAME):
+            return
+        collection = Collection(self.COLLECTION_NAME)
+        partition_name = f"tenant_{self.tenant_id.replace('-', '_')}"
+        if collection.has_partition(partition_name):
+            collection.drop_partition(partition_name)
+        # 若除 _default 外无其他分区，删除整个 collection
+        remaining = [p for p in collection.partitions if p.name != "_default"]
+        if not remaining:
+            utility.drop_collection(self.COLLECTION_NAME)
 
     def get_collection_stats(self) -> dict[str, Any]:
         """
