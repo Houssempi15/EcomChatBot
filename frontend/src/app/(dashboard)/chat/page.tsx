@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { message, Spin } from 'antd';
 import {
@@ -29,7 +29,6 @@ export default function ChatPage() {
     isLoading,
     pagination,
     statusFilter,
-    wsStatus,
     ragSources,
     fetchConversations,
     selectConversation,
