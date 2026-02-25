@@ -215,12 +215,12 @@ export default function KnowledgePage() {
     // TODO: Open preview modal
   };
 
-  const handleSearch = async (query: string, useRerank?: boolean): Promise<KnowledgeSearchResult[]> => {
+  const handleSearch = async (query: string, rerankModelId?: number): Promise<KnowledgeSearchResult[]> => {
     try {
       const response = await knowledgeApi.ragQuery({
         query,
         top_k: 5,
-        use_rerank: useRerank || false,
+        use_rerank: !!rerankModelId,
       });
       if (response.success && response.data) {
         return response.data.results.map((item) => ({
@@ -320,6 +320,12 @@ export default function KnowledgePage() {
             showIcon
           />
         )}
+        <Alert
+          className="mt-3"
+          message="请先保存设置后再上传文档，否则刷新页面后模型选择将丢失。"
+          type="info"
+          showIcon
+        />
       </Card>
 
       {/* Stats */}

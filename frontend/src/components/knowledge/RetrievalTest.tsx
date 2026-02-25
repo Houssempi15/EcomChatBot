@@ -14,7 +14,7 @@ interface RerankModel {
 }
 
 interface RetrievalTestProps {
-  onSearch: (query: string, useRerank?: boolean) => Promise<KnowledgeSearchResult[]>;
+  onSearch: (query: string, rerankModelId?: number) => Promise<KnowledgeSearchResult[]>;
   rerankModels?: RerankModel[];
 }
 
@@ -23,7 +23,7 @@ export default function RetrievalTest({ onSearch, rerankModels }: RetrievalTestP
   const [results, setResults] = useState<KnowledgeSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
-  const [useRerank, setUseRerank] = useState<boolean>(false);
+  const [selectedRerankModelId, setSelectedRerankModelId] = useState<number | undefined>(undefined);
 
   const handleSearch = async () => {
     if (!query.trim()) return;
@@ -31,7 +31,7 @@ export default function RetrievalTest({ onSearch, rerankModels }: RetrievalTestP
     setLoading(true);
     setSearched(true);
     try {
-      const data = await onSearch(query, useRerank);
+      const data = await onSearch(query, selectedRerankModelId);
       setResults(data);
     } catch (error) {
       console.error('Search failed:', error);
@@ -84,9 +84,9 @@ export default function RetrievalTest({ onSearch, rerankModels }: RetrievalTestP
               style={{ width: 240 }}
               placeholder="不使用重排序"
               allowClear
-              value={useRerank ? true : undefined}
-              onChange={(val) => setUseRerank(!!val)}
-              options={[{ value: true, label: `使用重排（已配置 ${rerankModels!.length} 个模型）` }]}
+              value={selectedRerankModelId}
+              onChange={(val) => setSelectedRerankModelId(val)}
+              options={rerankModels!.map((m) => ({ value: m.id, label: `${m.model_name} (${m.provider})` }))}
             />
           </Form.Item>
         </Form>
@@ -105,7 +105,7 @@ export default function RetrievalTest({ onSearch, rerankModels }: RetrievalTestP
       {!loading && results.length > 0 && (
         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
           <Text strong className="block mb-3">
-            Top {results.length} 匹配结果{useRerank ? '（已重排序）' : ''}:
+            Top {results.length} 匹配结果{selectedRerankModelId ? '（已重排序）' : ''}:
           </Text>
           <div className="space-y-3">
             {results.map((result, index) => (
