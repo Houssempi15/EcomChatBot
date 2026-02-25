@@ -12,16 +12,50 @@ export interface SubscriptionStatus {
   is_trial: boolean;
 }
 
-export interface SubscriptionPlan {
-  name: string;
-  price: number;
-  days: number;
+export interface CreateOrderResponse {
+  order_id: number;
+  order_number: string;
+  amount: number;
+  currency: string;
+  qr_code_url: string;
+  payment_channel: string;
+  expires_at: string;
+}
+
+export interface OrderStatus {
+  order_number: string;
+  status: 'pending' | 'paid' | 'failed' | 'cancelled' | 'expired';
+  amount: number;
+  trade_no: string | null;
+  qr_code_url: string | null;
+  paid_at: string | null;
+  expired_at: string;
+  created_at: string;
 }
 
 export const subscriptionApi = {
   getStatus: async (): Promise<ApiResponse<SubscriptionStatus>> => {
     const response = await apiClient.get<ApiResponse<SubscriptionStatus>>(
       '/tenant/subscription/status'
+    );
+    return response.data;
+  },
+
+  createOrder: async (params: {
+    plan_type: string;
+    payment_channel: 'wechat' | 'alipay';
+    subscription_type?: string;
+  }): Promise<ApiResponse<CreateOrderResponse>> => {
+    const response = await apiClient.post<ApiResponse<CreateOrderResponse>>(
+      '/payment/orders/create',
+      params
+    );
+    return response.data;
+  },
+
+  syncOrder: async (orderNumber: string): Promise<ApiResponse<{ order: OrderStatus }>> => {
+    const response = await apiClient.post<ApiResponse<{ order: OrderStatus }>>(
+      `/payment/orders/${orderNumber}/sync`
     );
     return response.data;
   },
