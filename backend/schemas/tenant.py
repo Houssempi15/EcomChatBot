@@ -22,6 +22,7 @@ class TenantBase(BaseSchema):
 class TenantCreate(TenantBase):
     """创建租户"""
 
+    password: str = Field(..., min_length=8, max_length=64, description="初始密码")
     initial_plan: str = Field("free", description="初始套餐")
 
 
