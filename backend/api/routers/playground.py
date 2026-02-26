@@ -10,7 +10,7 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from api.dependencies import DBDep, TenantDep
+from api.dependencies import DBDep, TenantFlexDep
 from schemas import ApiResponse
 from services.llm_service import LLMService
 from services.model_config_service import ModelConfigService
@@ -57,7 +57,7 @@ async def _load_llm_service(db, tenant_id: str, model_config_id: int | None) -> 
 @router.post("/chat", response_model=ApiResponse[PlaygroundChatResponse])
 async def playground_chat(
     request: PlaygroundChatRequest,
-    tenant_id: TenantDep,
+    tenant_id: TenantFlexDep,
     db: DBDep,
 ):
     """
@@ -112,7 +112,7 @@ async def playground_chat(
 @router.post("/chat-stream")
 async def playground_chat_stream(
     request: PlaygroundChatRequest,
-    tenant_id: TenantDep,
+    tenant_id: TenantFlexDep,
     db: DBDep,
 ):
     """
