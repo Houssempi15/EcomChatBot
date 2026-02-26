@@ -136,15 +136,15 @@ class Settings(BaseSettings):
     yungouos_alipay_key: str = ""
     yungouos_notify_url: str = ""
 
-    # 拼多多开放平台
-    PDD_APP_KEY: str = ""
-    PDD_APP_SECRET: str = ""
-    PDD_WEBHOOK_TOKEN: str = ""
-    PDD_API_BASE_URL: str = "https://gw-api.pinduoduo.com/api/router"
+    # ============ 拼多多开放平台配置 ============
+    pdd_app_key: str = ""
+    pdd_app_secret: str = ""
+    pdd_webhook_token: str = ""
+    pdd_api_base_url: str = "https://gw-api.pinduoduo.com/api/router"
     # AI 介入阈值：置信度低于此值时转人工
-    PDD_AI_CONFIDENCE_THRESHOLD: float = 0.6
+    pdd_ai_confidence_threshold: float = 0.6
     # 触发转人工的关键词
-    PDD_HUMAN_TAKEOVER_KEYWORDS: list[str] = ["转人工", "人工客服", "真人", "投诉", "退款"]
+    pdd_human_takeover_keywords: list[str] = ["转人工", "人工客服", "真人", "投诉", "退款"]
 
     @field_validator("cors_origins", mode="before")
     @classmethod
