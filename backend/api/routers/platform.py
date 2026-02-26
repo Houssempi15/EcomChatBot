@@ -5,10 +5,12 @@ import logging
 
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import DBDep, TenantTokenDep
+from core.crypto import decrypt_field, encrypt_field
 from models.platform import PlatformConfig
 from schemas.platform import PlatformConfigCreate, PlatformConfigResponse, PinduoduoWebhookPayload
 from services.platform.pinduoduo_client import PinduoduoClient
@@ -36,12 +38,36 @@ async def pinduoduo_webhook(
     """接收拼多多 Webhook 推送，验签后异步处理"""
     body = await request.body()
 
-    # 验签（需要先查到对应的 app_secret，这里做简单的格式校验）
-    # 实际生产中应先解析 shop_id，再查 app_secret 做精确验签
     try:
         payload_data = await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="无效的请求体")
+
+    # 验签：解析 shop_id → 查 config → 解密 secret → 验签
+    shop_id = str(payload_data.get("shop_id", ""))
+    if pdd_sign and shop_id:
+        stmt = select(PlatformConfig).where(
+            and_(
+                PlatformConfig.platform_type == "pinduoduo",
+                PlatformConfig.shop_id == shop_id,
+                PlatformConfig.is_active == True,
+            )
+        )
+        result = await db.execute(stmt)
+        config = result.scalar_one_or_none()
+
+        if config and config.app_secret:
+            try:
+                plain_secret = decrypt_field(config.app_secret)
+            except Exception:
+                plain_secret = config.app_secret  # 兼容未加密的旧数据
+            client = PinduoduoClient(config.app_key, plain_secret)
+            if not client.verify_webhook_signature(body, pdd_sign):
+                raise HTTPException(status_code=401, detail="Webhook 签名验证失败")
+        else:
+            # 未找到配置时拒绝带签名的请求
+            if pdd_sign:
+                raise HTTPException(status_code=401, detail="未找到对应的平台配置")
 
     service = PlatformMessageService(db)
     background_tasks.add_task(service.handle_pinduoduo_webhook, payload_data)
@@ -77,11 +103,10 @@ async def pinduoduo_callback(
     state: str,  # tenant_id
     db: DBDep,
 ):
-    """处理拼多多 OAuth 回调，换取 access_token 并保存"""
+    """处理拼多多 OAuth 回调，换取 access_token 并保存，然后重定向到前端"""
     import httpx
     from datetime import datetime, timedelta
 
-    # 查找该租户的平台配置（需要 app_key/app_secret 已预先保存）
     stmt = select(PlatformConfig).where(
         and_(
             PlatformConfig.tenant_id == state,
@@ -92,10 +117,14 @@ async def pinduoduo_callback(
     config = result.scalar_one_or_none()
 
     if not config:
-        raise HTTPException(status_code=400, detail="请先在设置页面填写 App Key 和 App Secret")
+        return RedirectResponse(url="/settings?menu=platform&status=error&msg=no_config")
 
-    # 换取 access_token
-    client = PinduoduoClient(config.app_key, config.app_secret)
+    try:
+        plain_secret = decrypt_field(config.app_secret)
+    except Exception:
+        plain_secret = config.app_secret
+
+    client = PinduoduoClient(config.app_key, plain_secret)
     try:
         token_data = await client.call_api(
             method="pdd.pop.auth.token.create",
@@ -103,11 +132,11 @@ async def pinduoduo_callback(
         )
     except Exception as e:
         logger.error("换取 access_token 失败: %s", e)
-        raise HTTPException(status_code=502, detail="换取授权令牌失败")
+        return RedirectResponse(url="/settings?menu=platform&status=error&msg=token_failed")
 
     access_token = token_data.get("access_token")
     refresh_token = token_data.get("refresh_token")
-    expires_in = token_data.get("expires_in", 7776000)  # 默认 90 天
+    expires_in = token_data.get("expires_in", 7776000)
     owner_id = str(token_data.get("owner_id", ""))
 
     config.access_token = access_token
@@ -117,7 +146,7 @@ async def pinduoduo_callback(
     config.is_active = True
     await db.commit()
 
-    return {"success": True, "message": "授权成功", "shop_id": owner_id}
+    return RedirectResponse(url="/settings?menu=platform&status=success")
 
 
 # ---------------------------------------------------------------------------
@@ -143,7 +172,7 @@ async def upsert_platform_config(
     body: PlatformConfigCreate,
     platform: str = "pinduoduo",
 ):
-    """创建或更新指定平台的配置（upsert）"""
+    """创建或更新指定平台的配置（upsert），app_secret 加密存储"""
     stmt = select(PlatformConfig).where(
         and_(
             PlatformConfig.tenant_id == tenant_id,
@@ -153,9 +182,11 @@ async def upsert_platform_config(
     result = await db.execute(stmt)
     config = result.scalar_one_or_none()
 
+    encrypted_secret = encrypt_field(body.app_secret)
+
     if config:
         config.app_key = body.app_key
-        config.app_secret = body.app_secret
+        config.app_secret = encrypted_secret
         config.auto_reply_threshold = body.auto_reply_threshold
         config.human_takeover_message = body.human_takeover_message
     else:
@@ -163,7 +194,7 @@ async def upsert_platform_config(
             tenant_id=tenant_id,
             platform_type=platform,
             app_key=body.app_key,
-            app_secret=body.app_secret,
+            app_secret=encrypted_secret,
             auto_reply_threshold=body.auto_reply_threshold,
             human_takeover_message=body.human_takeover_message,
             is_active=False,
@@ -201,3 +232,79 @@ async def disconnect_platform(
     await db.commit()
 
     return {"success": True, "message": f"已断开 {platform} 连接"}
+
+
+# ---------------------------------------------------------------------------
+# 人工回复（JWT 认证）
+# ---------------------------------------------------------------------------
+
+class ManualReplyRequest(BaseModel):
+    conversation_id: str
+    content: str
+
+
+@router.post("/pinduoduo/reply", summary="人工回复拼多多消息")
+async def manual_reply(
+    tenant_id: TenantTokenDep,
+    db: DBDep,
+    body: ManualReplyRequest,
+):
+    """管理员人工回复拼多多买家消息"""
+    from datetime import datetime
+    from models import Conversation, Message
+    from sqlalchemy import select as sa_select
+
+    # 查找会话
+    stmt = sa_select(Conversation).where(
+        and_(
+            Conversation.tenant_id == tenant_id,
+            Conversation.conversation_id == body.conversation_id,
+            Conversation.platform_type == "pinduoduo",
+        )
+    )
+    result = await db.execute(stmt)
+    conversation = result.scalar_one_or_none()
+    if not conversation:
+        raise HTTPException(status_code=404, detail="会话不存在")
+
+    # 查找平台配置
+    stmt2 = sa_select(PlatformConfig).where(
+        and_(
+            PlatformConfig.tenant_id == tenant_id,
+            PlatformConfig.platform_type == "pinduoduo",
+            PlatformConfig.is_active == True,
+        )
+    )
+    result2 = await db.execute(stmt2)
+    config = result2.scalar_one_or_none()
+    if not config:
+        raise HTTPException(status_code=400, detail="平台未连接")
+
+    try:
+        plain_secret = decrypt_field(config.app_secret)
+    except Exception:
+        plain_secret = config.app_secret
+
+    client = PinduoduoClient(config.app_key, plain_secret)
+    try:
+        await client.send_message(
+            access_token=config.access_token,
+            conversation_id=conversation.platform_conversation_id,
+            content=body.content,
+        )
+    except Exception as e:
+        logger.error("人工回复发送失败: %s", e)
+        raise HTTPException(status_code=502, detail="消息发送失败")
+
+    # 保存消息记录
+    msg = Message(
+        tenant_id=tenant_id,
+        message_id=f"msg_{int(datetime.utcnow().timestamp())}_human",
+        conversation_id=body.conversation_id,
+        role="assistant",
+        content=body.content,
+    )
+    db.add(msg)
+    await db.commit()
+
+    return {"success": True}

@@ -50,4 +50,15 @@ export const platformApi = {
   getAuthUrl: (appKey: string, redirectUri: string): string => {
     return `/api/v1/platform/pinduoduo/auth?app_key=${encodeURIComponent(appKey)}&redirect_uri=${encodeURIComponent(redirectUri)}`;
   },
+
+  sendPlatformMessage: async (
+    conversationId: string,
+    content: string
+  ): Promise<ApiResponse<{ success: boolean }>> => {
+    const response = await apiClient.post<ApiResponse<{ success: boolean }>>(
+      '/platform/pinduoduo/reply',
+      { conversation_id: conversationId, content }
+    );
+    return response.data;
+  },
 };

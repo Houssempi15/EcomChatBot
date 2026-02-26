@@ -180,7 +180,12 @@ class PlatformMessageService:
             reply_text = result["response"]
 
             # 发送到拼多多
-            client = PinduoduoClient(config.app_key, config.app_secret)
+            from core.crypto import decrypt_field
+            try:
+                plain_secret = decrypt_field(config.app_secret)
+            except Exception:
+                plain_secret = config.app_secret
+            client = PinduoduoClient(config.app_key, plain_secret)
             await client.send_message(
                 access_token=config.access_token,
                 conversation_id=conversation.platform_conversation_id,
@@ -219,7 +224,12 @@ class PlatformMessageService:
         # 发送转人工提示语给买家
         if config.human_takeover_message and config.access_token:
             try:
-                client = PinduoduoClient(config.app_key, config.app_secret)
+                from core.crypto import decrypt_field
+                try:
+                    plain_secret = decrypt_field(config.app_secret)
+                except Exception:
+                    plain_secret = config.app_secret
+                client = PinduoduoClient(config.app_key, plain_secret)
                 await client.send_message(
                     access_token=config.access_token,
                     conversation_id=conversation.platform_conversation_id,

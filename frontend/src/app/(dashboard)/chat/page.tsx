@@ -9,6 +9,7 @@ import {
   RightPanel,
 } from '@/components/chat';
 import { conversationApi } from '@/lib/api';
+import { platformApi } from '@/lib/api/platform';
 import { useConversationStore } from '@/store/conversationStore';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { Message } from '@/types';
@@ -139,12 +140,20 @@ export default function ChatPage() {
     setInputValue('');
 
     if (currentConversation?.status === 'waiting') {
-      // Human takeover mode: use REST
+      // Human takeover mode
       setSending(true);
       try {
-        const response = await conversationApi.sendMessage(selectedId, { content });
-        if (!response.success) {
-          message.error(response.error?.message || '发送失败');
+        // 拼多多平台会话走平台回复 API，其他走通用 REST
+        if (currentConversation.platform_type === 'pinduoduo') {
+          const response = await platformApi.sendPlatformMessage(selectedId, content);
+          if (!response.success) {
+            message.error('发送失败');
+          }
+        } else {
+          const response = await conversationApi.sendMessage(selectedId, { content });
+          if (!response.success) {
+            message.error(response.error?.message || '发送失败');
+          }
         }
       } catch {
         message.error('发送消息失败');

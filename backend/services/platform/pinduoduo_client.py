@@ -9,10 +9,15 @@ import time
 from typing import Any
 
 import httpx
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 logger = logging.getLogger(__name__)
 
 PDD_API_URL = "https://gw-api.pinduoduo.com/api/router"
+
+
+class PinduoduoAPIError(Exception):
+    """拼多多 API 调用失败"""
 
 
 class PinduoduoClient:
@@ -61,14 +66,20 @@ class PinduoduoClient:
             resp.raise_for_status()
             return resp.json()
 
+    @retry(
+        retry=retry_if_exception_type((httpx.HTTPError, PinduoduoAPIError)),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        reraise=True,
+    )
     async def send_message(
         self,
         access_token: str,
         conversation_id: str,
         content: str,
     ) -> dict[str, Any]:
-        """向买家发送消息"""
-        return await self.call_api(
+        """向买家发送消息（失败自动重试 3 次，指数退避 2-10s）"""
+        result = await self.call_api(
             method="pdd.im.message.send",
             params={
                 "conversation_id": conversation_id,
@@ -77,6 +88,12 @@ class PinduoduoClient:
             },
             access_token=access_token,
         )
+        if "error_response" in result:
+            err = result["error_response"]
+            raise PinduoduoAPIError(
+                f"发送消息失败: {err.get('error_msg', '')} (code={err.get('error_code', '')})"
+            )
+        return result
 
     async def refresh_access_token(self, refresh_token: str) -> dict[str, Any]:
         """刷新 access_token"""
