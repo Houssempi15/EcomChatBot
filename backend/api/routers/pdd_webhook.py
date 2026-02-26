@@ -1,3 +1,4 @@
+import json
 import logging
 from fastapi import APIRouter, Request, HTTPException, BackgroundTasks
 from services.pdd_channel import PddChannel
@@ -24,7 +25,7 @@ async def pdd_webhook(request: Request, background_tasks: BackgroundTasks):
     if not channel.verify_signature(body, signature):
         raise HTTPException(status_code=403, detail="Invalid signature")
 
-    payload = await request.json()
+    payload = json.loads(body)
     msg = channel.parse_message(payload)
 
     if msg is None:
@@ -36,27 +37,27 @@ async def pdd_webhook(request: Request, background_tasks: BackgroundTasks):
 
 async def handle_message(msg: dict) -> None:
     """后台处理消息：AI 回复或转人工"""
-    conversation_id = msg["conversation_id"]
-    content = msg["content"]
-    tenant_id = settings.pdd_app_key or "pdd_default"
-
-    # 1. 检查是否已在人工模式
-    if await session_manager.is_human_mode(conversation_id):
-        logger.info(f"[PDD] conv={conversation_id} 人工模式，跳过 AI")
-        return
-
-    # 2. 检测转人工关键词
-    if channel.should_transfer_to_human(content):
-        await session_manager.set_human_mode(conversation_id, True)
-        await pdd_client.send_message(
-            conversation_id,
-            "好的，正在为您转接人工客服，请稍候～",
-        )
-        logger.info(f"[PDD] conv={conversation_id} 触发转人工")
-        return
-
-    # 3. 调用 AI 引擎生成回复
     try:
+        conversation_id = msg["conversation_id"]
+        content = msg["content"]
+        tenant_id = settings.pdd_app_key or "pdd_default"
+
+        # 1. 检查是否已在人工模式
+        if await session_manager.is_human_mode(conversation_id):
+            logger.info(f"[PDD] conv={conversation_id} 人工模式，跳过 AI")
+            return
+
+        # 2. 检测转人工关键词
+        if channel.should_transfer_to_human(content):
+            await session_manager.set_human_mode(conversation_id, True)
+            await pdd_client.send_message(
+                conversation_id,
+                "好的，正在为您转接人工客服，请稍候～",
+            )
+            logger.info(f"[PDD] conv={conversation_id} 触发转人工")
+            return
+
+        # 3. 调用 AI 引擎生成回复
         async with AsyncSessionLocal() as db:
             result = await simple_chat(
                 db=db,
@@ -69,8 +70,11 @@ async def handle_message(msg: dict) -> None:
             await pdd_client.send_message(conversation_id, reply)
             logger.info(f"[PDD] conv={conversation_id} AI 回复成功")
     except Exception as e:
-        logger.error(f"[PDD] AI 回复失败: {e}")
-        await pdd_client.send_message(
-            conversation_id,
-            "抱歉，系统繁忙，请稍后再试，或联系人工客服。",
-        )
+        logger.error(f"[PDD] 消息处理失败: {e}", exc_info=True)
+        # Best-effort fallback: try to send error message if we have conversation_id
+        try:
+            cid = msg.get("conversation_id")
+            if cid:
+                await pdd_client.send_message(cid, "抱歉，系统繁忙，请稍后再试，或联系人工客服。")
+        except Exception:
+            pass
