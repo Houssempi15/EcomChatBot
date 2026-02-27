@@ -45,6 +45,7 @@ export interface TenantInfo {
   contact_phone: string | null;
   status: string;
   current_plan: string;
+  api_key_prefix: string | null;
 }
 
 export const settingsApi = {
@@ -210,6 +211,18 @@ export const settingsApi = {
       '/models/batch-save',
       { models }
     );
+    return response.data;
+  },
+
+  // Get tenant info (includes api_key_prefix)
+  getTenantInfo: async (): Promise<ApiResponse<TenantInfo>> => {
+    const response = await apiClient.get<ApiResponse<TenantInfo>>('/tenant/info-token');
+    return response.data;
+  },
+
+  // Reset tenant API Key (returns new key once)
+  resetApiKey: async (): Promise<ApiResponse<{ api_key: string; api_key_prefix: string; message: string }>> => {
+    const response = await apiClient.post<ApiResponse<{ api_key: string; api_key_prefix: string; message: string }>>('/tenant/reset-api-key');
     return response.data;
   },
 };
