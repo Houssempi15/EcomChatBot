@@ -59,6 +59,8 @@ export default function SettingsPage() {
         if (res.success && res.data) {
           setApiKeyPrefix(res.data.api_key_prefix);
         }
+      }).catch(() => {
+        // 静默失败，前缀显示为未知
       });
     }
   }, [selectedMenu]);
@@ -162,8 +164,8 @@ export default function SettingsPage() {
             <Modal
               title="API Key 已重置"
               open={newApiKeyModal}
-              onOk={() => setNewApiKeyModal(false)}
-              onCancel={() => setNewApiKeyModal(false)}
+              onOk={() => { setNewApiKeyModal(false); setNewApiKey(''); }}
+              onCancel={() => { setNewApiKeyModal(false); setNewApiKey(''); }}
               okText="我已保存"
               cancelButtonProps={{ style: { display: 'none' } }}
             >
