@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Row, Col, Card, Typography, message, Alert, Form, Input, Button, Slider, Spin, Steps } from 'antd';
+import { Row, Col, Card, Typography, message, Alert, Form, Input, Button, Slider, Spin, Steps, Modal } from 'antd';
 import { SettingsMenu, ModelConfigForm, SubscriptionPanel } from '@/components/settings';
 import { CopyOutlined, LinkOutlined, DisconnectOutlined, CheckCircleOutlined, KeyOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useAuthStore } from '@/store';
