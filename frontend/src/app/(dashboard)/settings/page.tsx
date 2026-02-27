@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Row, Col, Card, Typography, message, Alert, Form, Input, Button, Slider, Spin, Steps } from 'antd';
 import { SettingsMenu, ModelConfigForm, SubscriptionPanel } from '@/components/settings';
-import { CopyOutlined, LinkOutlined, DisconnectOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { CopyOutlined, LinkOutlined, DisconnectOutlined, CheckCircleOutlined, KeyOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useAuthStore } from '@/store';
 import { platformApi, PlatformConfig } from '@/lib/api/platform';
+import { settingsApi } from '@/lib/api/settings';
 
 const { Title, Text } = Typography;
 
@@ -14,6 +15,11 @@ export default function SettingsPage() {
   const searchParams = useSearchParams();
   const [selectedMenu, setSelectedMenu] = useState('model');
   const { tenantId } = useAuthStore();
+  const [apiKeyPrefix, setApiKeyPrefix] = useState<string | null>(null);
+  const [apiKeyLoading, setApiKeyLoading] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [newApiKeyModal, setNewApiKeyModal] = useState(false);
+  const [newApiKey, setNewApiKey] = useState('');
   const [pddConfig, setPddConfig] = useState<PlatformConfig | null>(null);
   const [pddLoading, setPddLoading] = useState(false);
   const [pddForm] = Form.useForm();
@@ -47,58 +53,142 @@ export default function SettingsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMenu]);
 
+  useEffect(() => {
+    if (selectedMenu === 'api') {
+      settingsApi.getTenantInfo().then((res) => {
+        if (res.success && res.data) {
+          setApiKeyPrefix(res.data.api_key_prefix);
+        }
+      });
+    }
+  }, [selectedMenu]);
+
+  const handleResetApiKey = async () => {
+    setApiKeyLoading(true);
+    setResetConfirmOpen(false);
+    try {
+      const res = await settingsApi.resetApiKey();
+      if (res.success && res.data) {
+        setNewApiKey(res.data.api_key);
+        setApiKeyPrefix(res.data.api_key_prefix);
+        setNewApiKeyModal(true);
+      } else {
+        message.error('重置失败，请重试');
+      }
+    } catch {
+      message.error('重置失败，请重试');
+    } finally {
+      setApiKeyLoading(false);
+    }
+  };
+
   const renderContent = () => {
     switch (selectedMenu) {
       case 'model':
         return <ModelConfigForm />;
       case 'api':
         return (
-          <Card>
-            <Title level={5} className="mb-4">API 密钥管理</Title>
-            <Alert
-              message="API 密钥用于外部系统接入"
-              description="您可以使用此 API 密钥将智能客服集成到您的应用中。请妥善保管，不要泄露给他人。"
-              type="info"
-              showIcon
-              className="mb-6"
-            />
-            <div className="bg-gray-100 p-4 rounded-lg">
-              <Text type="secondary" className="block mb-2">租户 ID:</Text>
-              <div className="flex items-center gap-2 mb-4">
-                <Input
-                  value={tenantId || ''}
-                  readOnly
-                  style={{ flex: 1, fontFamily: 'monospace' }}
-                />
-                <Button
-                  icon={<CopyOutlined />}
-                  onClick={() => {
-                    if (tenantId) {
-                      navigator.clipboard.writeText(tenantId);
+          <>
+            <Card>
+              <Title level={5} className="mb-4">API 密钥管理</Title>
+              <Alert
+                message="API 密钥用于外部系统接入"
+                description="您可以使用此 API 密钥将智能客服集成到您的应用中。请妥善保管，不要泄露给他人。"
+                type="info"
+                showIcon
+                className="mb-6"
+              />
+              <div className="bg-gray-100 p-4 rounded-lg">
+                <Text type="secondary" className="block mb-2">租户 ID:</Text>
+                <div className="flex items-center gap-2 mb-4">
+                  <Input
+                    value={tenantId || ''}
+                    readOnly
+                    style={{ flex: 1, fontFamily: 'monospace' }}
+                  />
+                  <Button
+                    icon={<CopyOutlined />}
+                    onClick={() => {
+                      if (tenantId) {
+                        navigator.clipboard.writeText(tenantId);
+                        message.success('已复制到剪贴板');
+                      }
+                    }}
+                  >
+                    复制
+                  </Button>
+                </div>
+                <Text type="secondary" className="block mb-2">API Key 前缀:</Text>
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={apiKeyPrefix ? `${apiKeyPrefix}...` : '（未知，请重置获取新 Key）'}
+                    readOnly
+                    style={{ flex: 1, fontFamily: 'monospace' }}
+                    prefix={<KeyOutlined />}
+                  />
+                  <Button
+                    danger
+                    loading={apiKeyLoading}
+                    onClick={() => setResetConfirmOpen(true)}
+                  >
+                    重置 API Key
+                  </Button>
+                </div>
+              </div>
+              <Alert
+                message="认证方式"
+                description="外部 API 请求在 Header 中添加 X-API-Key: {api_key}；Dashboard 使用 Authorization: Bearer {access_token}"
+                type="info"
+                showIcon
+                className="mt-4"
+              />
+            </Card>
+
+            {/* 确认重置弹窗 */}
+            <Modal
+              title={<span><ExclamationCircleOutlined className="text-yellow-500 mr-2" />确认重置 API Key</span>}
+              open={resetConfirmOpen}
+              onOk={handleResetApiKey}
+              onCancel={() => setResetConfirmOpen(false)}
+              okText="确认重置"
+              cancelText="取消"
+              okButtonProps={{ danger: true }}
+            >
+              <p>重置后，旧的 API Key 将<strong>立即失效</strong>，所有使用旧 Key 的集成需要同步更新。</p>
+              <p>确认继续？</p>
+            </Modal>
+
+            {/* 新 Key 展示弹窗 */}
+            <Modal
+              title="API Key 已重置"
+              open={newApiKeyModal}
+              onOk={() => setNewApiKeyModal(false)}
+              onCancel={() => setNewApiKeyModal(false)}
+              okText="我已保存"
+              cancelButtonProps={{ style: { display: 'none' } }}
+            >
+              <Alert
+                message="请立即复制保存，此 Key 仅显示一次"
+                type="warning"
+                showIcon
+                className="mb-4"
+              />
+              <Input.Password
+                value={newApiKey}
+                readOnly
+                style={{ fontFamily: 'monospace' }}
+                addonAfter={
+                  <CopyOutlined
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => {
+                      navigator.clipboard.writeText(newApiKey);
                       message.success('已复制到剪贴板');
-                    }
-                  }}
-                >
-                  复制
-                </Button>
-              </div>
-              <Text type="secondary" className="block mb-2">API Key (使用JWT Token认证):</Text>
-              <div className="flex items-center gap-2">
-                <Input.Password
-                  value="请使用登录后获取的 access_token"
-                  readOnly
-                  style={{ flex: 1, fontFamily: 'monospace' }}
-                />
-              </div>
-            </div>
-            <Alert
-              message="认证方式"
-              description="API 请求需要在 Header 中添加 Authorization: Bearer {access_token}"
-              type="info"
-              showIcon
-              className="mt-4"
-            />
-          </Card>
+                    }}
+                  />
+                }
+              />
+            </Modal>
+          </>
         );
       case 'tenant':
         return (
