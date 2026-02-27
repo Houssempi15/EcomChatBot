@@ -10,7 +10,6 @@ from core.exceptions import BillNotFoundException
 from core.security import generate_tenant_id
 from models import Bill, Subscription
 from services.subscription_service import SubscriptionService
-from services.usage_service import UsageService
 
 
 class BillingService:
@@ -18,7 +17,6 @@ class BillingService:
 
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.usage_service = UsageService(db)
         self.subscription_service = SubscriptionService(db)
 
     async def get_bill(self, bill_id: str) -> Bill:
@@ -70,17 +68,15 @@ class BillingService:
         """
         生成月度账单
         """
-        # 获取订阅和用量
+        # 获取订阅信息
         subscription = await self.subscription_service.get_subscription(tenant_id)
-        usage_summary = await self.usage_service.get_usage_summary(tenant_id, year, month)
 
-        # 计算费用
+        # 计算费用（订阅制，仅按套餐收费）
         from core.permissions import PLAN_CONFIGS
 
         plan_config = PLAN_CONFIGS.get(subscription.plan_type, PLAN_CONFIGS["free"])
         base_fee = plan_config["base_price"]
-        overage_fee = usage_summary["total_overage_fee"]
-        total_amount = base_fee + overage_fee
+        total_amount = base_fee
 
         # 生成账单
         bill_id = f"bill_{tenant_id}_{year}{month:02d}_{int(datetime.utcnow().timestamp())}"
@@ -91,7 +87,6 @@ class BillingService:
             tenant_id=tenant_id,
             billing_period=billing_period,
             base_fee=base_fee,
-            overage_fee=overage_fee,
             discount=0.0,
             adjustment_amount=0.0,
             total_amount=total_amount,
@@ -116,7 +111,7 @@ class BillingService:
 
         bill.adjustment_amount = adjustment_amount
         bill.adjustment_reason = reason
-        bill.total_amount = bill.base_fee + bill.overage_fee + adjustment_amount - bill.discount
+        bill.total_amount = bill.base_fee + adjustment_amount - bill.discount
 
         await self.db.commit()
         await self.db.refresh(bill)
@@ -200,11 +195,6 @@ class BillingService:
 
     async def calculate_arr_mrr(self) -> dict:
         """计算 ARR 和 MRR"""
-        # MRR: 月度经常性收入
-        stmt = select(func.sum(Subscription.conversation_quota * 0.0)).where(
-            Subscription.status == "active"
-        )
-        # TODO: 这里需要从PLAN_CONFIGS获取base_price，简化处理
         from core.permissions import PLAN_CONFIGS
 
         # 获取所有活跃订阅

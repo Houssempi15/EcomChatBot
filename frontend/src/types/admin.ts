@@ -98,9 +98,11 @@ export interface TenantUpdateStatusRequest {
   reason?: string;
 }
 
-export interface QuotaAdjustRequest {
-  quota_type: 'conversation' | 'storage' | 'api_calls';
-  amount: number;
+export interface ExtendSubscriptionRequest {
+  days: number;
+}
+
+export interface SuspendSubscriptionRequest {
   reason?: string;
 }
 
@@ -116,8 +118,7 @@ export type BatchOperation =
   | 'delete'
   | 'upgrade_plan'
   | 'downgrade_plan'
-  | 'extend_service'
-  | 'reset_quota';
+  | 'extend_service';
 
 export interface BatchOperationResponse {
   success: string[];
@@ -161,10 +162,6 @@ export interface SubscriptionInfo {
   expire_at: string;
   auto_renew: boolean;
   is_trial?: boolean;
-  conversation_quota?: number;
-  api_quota?: number;
-  storage_quota?: number;
-  concurrent_quota?: number;
   created_at: string;
   updated_at: string;
 }
@@ -372,31 +369,3 @@ export interface AdminPaginatedResponse<T> {
   pages: number;
 }
 
-// Tenant Usage Types
-export interface TenantUsageSummary {
-  tenant_id: string;
-  period: string;
-  total_conversations: number;
-  total_input_tokens: number;
-  total_output_tokens: number;
-  max_storage_used: number;
-  total_api_calls: number;
-  total_overage_fee: number;
-}
-
-export interface TenantUsageDailyData {
-  date: string;
-  conversations: number;
-  input_tokens: number;
-  output_tokens: number;
-  total_tokens: number;
-  storage_used_gb: number;
-  api_calls: number;
-  overage_fee: number;
-}
-
-export interface TenantUsageDetail {
-  period: string;
-  summary: TenantUsageSummary;
-  daily_data: TenantUsageDailyData[];
-}

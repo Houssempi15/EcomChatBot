@@ -24,7 +24,7 @@ from schemas import (
     TenantUpdateStatus,
     TenantWithAPIKey,
 )
-from services import AdminService, AuditService, SubscriptionService, TenantService, UsageService
+from services import AdminService, AuditService, SubscriptionService, TenantService
 from core.permissions import SUBSCRIPTION_PLANS
 
 router = APIRouter(prefix="/admin", tags=["管理员"])
@@ -552,10 +552,6 @@ async def assign_plan(
         "expire_at": subscription.expire_at.isoformat() if subscription.expire_at else None,
         "auto_renew": subscription.auto_renew,
         "is_trial": subscription.is_trial,
-        "conversation_quota": subscription.conversation_quota,
-        "api_quota": subscription.api_quota,
-        "storage_quota": subscription.storage_quota,
-        "concurrent_quota": subscription.concurrent_quota,
     })
 
 
@@ -580,8 +576,7 @@ async def batch_operation(
     - upgrade_plan: 升级套餐（需要params.plan参数）
     - downgrade_plan: 降级套餐（需要params.plan参数）
     - extend_service: 延期服务（需要params.days参数，默认30天）
-    - reset_quota: 重置配额
-    
+
     权限：super_admin, support_admin
     """
     tenant_service = TenantService(db)
@@ -770,28 +765,6 @@ async def reset_tenant_api_key(
     )
 
 
-# ============ 用量统计 ============
-@router.get("/tenants/{tenant_id}/usage")
-async def get_tenant_usage(
-    tenant_id: str,
-    admin: AdminDep,
-    db: DBDep,
-    year: int = Query(default=None),
-    month: int = Query(default=None),
-):
-    """
-    获取租户用量统计（按月）
-
-    权限：所有管理员
-    """
-    now = datetime.utcnow()
-    year = year or now.year
-    month = month or now.month
-    service = UsageService(db)
-    data = await service.get_usage_detail(tenant_id, year, month)
-    return ApiResponse(data=data)
-
-
 # ============ 订阅管理 ============
 @router.get("/subscriptions")
 async def list_subscriptions(
@@ -854,10 +827,6 @@ async def list_subscriptions(
             "expire_at": subscription.expire_at.isoformat() if subscription.expire_at else None,
             "auto_renew": subscription.auto_renew,
             "is_trial": subscription.is_trial,
-            "conversation_quota": subscription.conversation_quota,
-            "api_quota": subscription.api_quota,
-            "storage_quota": subscription.storage_quota,
-            "concurrent_quota": subscription.concurrent_quota,
             "created_at": subscription.created_at.isoformat() if subscription.created_at else None,
             "updated_at": subscription.updated_at.isoformat() if subscription.updated_at else None,
         })
@@ -868,6 +837,84 @@ async def list_subscriptions(
         "page": page,
         "size": size,
         "pages": (total + size - 1) // size,
+    })
+
+
+# ============ 订阅操作（延期/暂停/激活） ============
+@router.post("/tenants/{tenant_id}/extend-subscription")
+async def extend_tenant_subscription(
+    tenant_id: str,
+    admin: AdminDep,
+    db: DBDep,
+    days: int = Query(30, ge=1, le=3650, description="延长天数"),
+):
+    """
+    延长租户订阅时间
+
+    权限：super_admin, support_admin
+    """
+    subscription_service = SubscriptionService(db)
+    subscription = await subscription_service.get_subscription(tenant_id)
+
+    new_expire = subscription.expire_at + timedelta(days=days)
+    subscription.expire_at = new_expire
+    if subscription.status == "expired":
+        subscription.status = "active"
+    await db.commit()
+    await db.refresh(subscription)
+
+    return ApiResponse(data={
+        "tenant_id": tenant_id,
+        "new_expire_at": subscription.expire_at.isoformat(),
+        "extended_days": days,
+    })
+
+
+@router.post("/tenants/{tenant_id}/suspend-subscription")
+async def suspend_tenant_subscription(
+    tenant_id: str,
+    admin: AdminDep,
+    db: DBDep,
+    reason: str = Query("", description="暂停原因"),
+):
+    """
+    暂停租户订阅
+
+    权限：super_admin, support_admin
+    """
+    subscription_service = SubscriptionService(db)
+    subscription = await subscription_service.get_subscription(tenant_id)
+
+    subscription.status = "cancelled"
+    await db.commit()
+
+    return ApiResponse(data={
+        "tenant_id": tenant_id,
+        "status": "cancelled",
+        "reason": reason,
+    })
+
+
+@router.post("/tenants/{tenant_id}/activate-subscription")
+async def activate_tenant_subscription(
+    tenant_id: str,
+    admin: AdminDep,
+    db: DBDep,
+):
+    """
+    激活租户订阅
+
+    权限：super_admin, support_admin
+    """
+    subscription_service = SubscriptionService(db)
+    subscription = await subscription_service.get_subscription(tenant_id)
+
+    subscription.status = "active"
+    await db.commit()
+
+    return ApiResponse(data={
+        "tenant_id": tenant_id,
+        "status": "active",
     })
 
 
@@ -926,7 +973,6 @@ async def list_bills(
             "company_name": tenant.company_name,
             "billing_period": bill.billing_period,
             "base_fee": float(bill.base_fee) if bill.base_fee else 0,
-            "overage_fee": float(bill.overage_fee) if bill.overage_fee else 0,
             "discount": float(bill.discount) if bill.discount else 0,
             "total_amount": float(bill.total_amount),
             "status": bill.status,

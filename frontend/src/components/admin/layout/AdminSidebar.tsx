@@ -126,7 +126,7 @@ export default function AdminSidebar() {
         {/* Logo */}
         <div className="h-16 flex items-center px-6 border-b border-gray-700">
           <SettingOutlined className="text-2xl text-blue-400 mr-3" />
-          <Text strong className="text-white text-lg">
+          <Text strong style={{ color: '#fff', fontSize: '1.05rem' }}>
             平台管理
           </Text>
         </div>
@@ -145,26 +145,38 @@ export default function AdminSidebar() {
         </div>
 
         {/* Admin Profile */}
-        <div className="p-4 border-t border-gray-700">
-          <div className="flex items-center">
+        <div className="p-3">
+          <div
+            className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl"
+            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}
+          >
             <Avatar
               size={36}
-              className="bg-blue-600"
-              icon={<UserOutlined />}
-            />
-            <div className="ml-3 flex-1 min-w-0">
-              <Text className="text-white text-sm block truncate">
+              style={{ background: '#1677ff', flexShrink: 0, fontWeight: 700, fontSize: '0.9rem' }}
+            >
+              {admin?.username ? admin.username[0].toUpperCase() : <UserOutlined />}
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <Text
+                className="text-white block truncate"
+                style={{ fontSize: '0.82rem', fontWeight: 600, lineHeight: '1.35', letterSpacing: '-0.01em' }}
+              >
                 {admin?.username || '管理员'}
               </Text>
-              <Text className="text-gray-400 text-xs block truncate">
+              <Text
+                className="block truncate"
+                style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.7rem', lineHeight: '1.35' }}
+              >
                 {admin?.role ? roleLabels[admin.role] || admin.role : ''}
               </Text>
             </div>
             <Tooltip title="退出登录">
               <Button
                 type="text"
-                icon={<LogoutOutlined className="text-gray-400 hover:text-white" />}
+                size="small"
+                icon={<LogoutOutlined style={{ color: 'rgba(255,255,255,0.5)' }} />}
                 onClick={handleLogout}
+                className="hover:!bg-white/10 transition-colors flex-shrink-0"
               />
             </Tooltip>
           </div>

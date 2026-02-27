@@ -4,16 +4,15 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Card, Tabs, Spin, message, Modal, Tag, Typography, Select, Form,
-  InputNumber, Button, DatePicker, Table, Statistic, Space, Row, Col, Input,
+  InputNumber, Button, Table, Space, Input,
 } from 'antd';
 import type { TabsProps, TableColumnsType } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
-import { Line } from '@ant-design/charts';
-import dayjs, { Dayjs } from 'dayjs';
-import { TenantDetailCard, TenantQuotaForm } from '@/components/admin/tenants';
+import { TenantDetailCard } from '@/components/admin/tenants';
+import { SubscriptionManagementForm } from '@/components/admin/tenants';
 import { adminTenantsApi, adminSubscriptionsApi } from '@/lib/api/admin';
 import { adminPaymentsApi } from '@/lib/api/admin/payments';
-import { TenantInfo, SubscriptionInfo, BillInfo, TenantUsageDetail, AdminPaginatedResponse } from '@/types/admin';
+import { TenantInfo, SubscriptionInfo, BillInfo, AdminPaginatedResponse } from '@/types/admin';
 
 const { Title, Text } = Typography;
 
@@ -25,15 +24,9 @@ export default function TenantDetailPage() {
   const [loading, setLoading] = useState(true);
   const [tenant, setTenant] = useState<TenantInfo | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
-  const [quotaModalOpen, setQuotaModalOpen] = useState(false);
+  const [subscriptionModalOpen, setSubscriptionModalOpen] = useState(false);
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const [planForm] = Form.useForm();
-
-  // Usage tab state
-  const [usageMonth, setUsageMonth] = useState<Dayjs>(dayjs());
-  const [usageData, setUsageData] = useState<TenantUsageDetail | null>(null);
-  const [usageLoading, setUsageLoading] = useState(false);
-  const [chartMetric, setChartMetric] = useState<'conversations' | 'total_tokens'>('conversations');
 
   // Bills tab state
   const [billsData, setBillsData] = useState<AdminPaginatedResponse<BillInfo> | null>(null);
@@ -68,20 +61,6 @@ export default function TenantDetailPage() {
       message.error('加载租户信息失败');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchUsageData = async (month: Dayjs) => {
-    setUsageLoading(true);
-    try {
-      const res = await adminTenantsApi.getUsage(tenantId, month.year(), month.month() + 1);
-      if (res.success && res.data) {
-        setUsageData(res.data);
-      }
-    } catch {
-      message.error('加载用量数据失败');
-    } finally {
-      setUsageLoading(false);
     }
   };
 
@@ -310,11 +289,6 @@ export default function TenantDetailPage() {
     },
   ];
 
-  const usageChartData = (usageData?.daily_data ?? []).map((d) => ({
-    date: d.date,
-    value: chartMetric === 'conversations' ? d.conversations : d.total_tokens,
-  }));
-
   const tabItems: TabsProps['items'] = [
     {
       key: 'overview',
@@ -325,7 +299,7 @@ export default function TenantDetailPage() {
             tenant={tenant}
             onStatusChange={handleStatusChange}
             onResetApiKey={handleResetApiKey}
-            onAdjustQuota={() => setQuotaModalOpen(true)}
+            onAdjustQuota={() => setSubscriptionModalOpen(true)}
             onAssignPlan={() => setPlanModalOpen(true)}
           />
         </div>
@@ -378,106 +352,6 @@ export default function TenantDetailPage() {
       ),
     },
     {
-      key: 'usage',
-      label: '用量统计',
-      children: (
-        <div className="space-y-4">
-          <div className="flex items-center gap-4">
-            <Text>选择月份：</Text>
-            <DatePicker.MonthPicker
-              value={usageMonth}
-              allowClear={false}
-              onChange={(date) => {
-                if (date) {
-                  setUsageMonth(date);
-                  fetchUsageData(date);
-                }
-              }}
-            />
-            {!usageData && !usageLoading && (
-              <Button type="primary" onClick={() => fetchUsageData(usageMonth)}>
-                查询
-              </Button>
-            )}
-          </div>
-          {usageLoading ? (
-            <div className="flex justify-center py-12"><Spin /></div>
-          ) : usageData ? (
-            <>
-              <Row gutter={16}>
-                <Col span={6}>
-                  <Card><Statistic title="总对话数" value={usageData.summary.total_conversations} /></Card>
-                </Col>
-                <Col span={6}>
-                  <Card>
-                    <Statistic
-                      title="总 Token 数"
-                      value={usageData.summary.total_input_tokens + usageData.summary.total_output_tokens}
-                    />
-                  </Card>
-                </Col>
-                <Col span={6}>
-                  <Card><Statistic title="API 调用次数" value={usageData.summary.total_api_calls} /></Card>
-                </Col>
-                <Col span={6}>
-                  <Card>
-                    <Statistic
-                      title="超额费用"
-                      value={usageData.summary.total_overage_fee}
-                      prefix="¥"
-                      precision={2}
-                    />
-                  </Card>
-                </Col>
-              </Row>
-              <Card
-                title="每日用量趋势"
-                extra={
-                  <Select
-                    value={chartMetric}
-                    onChange={setChartMetric}
-                    options={[
-                      { value: 'conversations', label: '对话数' },
-                      { value: 'total_tokens', label: 'Token 数' },
-                    ]}
-                    style={{ width: 120 }}
-                  />
-                }
-              >
-                <Line
-                  data={usageChartData}
-                  xField="date"
-                  yField="value"
-                  height={260}
-                />
-              </Card>
-              <Card title="每日明细">
-                <Table
-                  dataSource={usageData.daily_data}
-                  rowKey="date"
-                  size="small"
-                  pagination={false}
-                  columns={[
-                    { title: '日期', dataIndex: 'date', key: 'date' },
-                    { title: '对话数', dataIndex: 'conversations', key: 'conversations' },
-                    { title: '输入 Token', dataIndex: 'input_tokens', key: 'input_tokens' },
-                    { title: '输出 Token', dataIndex: 'output_tokens', key: 'output_tokens' },
-                    { title: 'API 调用', dataIndex: 'api_calls', key: 'api_calls' },
-                    {
-                      title: '超额费用',
-                      dataIndex: 'overage_fee',
-                      key: 'overage_fee',
-                      render: (v) => `¥${v.toFixed(2)}`,
-                    },
-                  ]}
-                />
-              </Card>
-            </>
-          ) : null}
-        </div>
-      ),
-    },
-    {
       key: 'bills',
       label: '账单记录',
       children: (
@@ -521,10 +395,11 @@ export default function TenantDetailPage() {
 
       <Tabs items={tabItems} />
 
-      <TenantQuotaForm
+      <SubscriptionManagementForm
         tenantId={tenantId}
-        open={quotaModalOpen}
-        onClose={() => setQuotaModalOpen(false)}
+        subscription={subscription ?? undefined}
+        open={subscriptionModalOpen}
+        onClose={() => setSubscriptionModalOpen(false)}
         onSuccess={fetchTenantData}
       />
 

@@ -15,7 +15,6 @@ from services.websocket_service import ConnectionManager, connection_manager
 from services.rag_service import RAGService
 from services.subscription_service import SubscriptionService
 from services.tenant_service import TenantService
-from services.usage_service import UsageService
 from services.webhook_service import WebhookService
 from services.webhook import WebhookPublisher
 from services.invoice_service import InvoiceService
@@ -47,7 +46,6 @@ __all__ = [
     "AuditService",
     "TenantService",
     "SubscriptionService",
-    "UsageService",
     "BillingService",
     "ConversationService",
     "ConversationChainService",

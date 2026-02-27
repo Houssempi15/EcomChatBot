@@ -91,13 +91,8 @@ class SubscriptionService:
         subscription.auto_renew = auto_renew
         subscription.is_trial = plan_type == "trial"
 
-        # 根据套餐设置配额
         features = plan_config["features"]
         subscription.enabled_features = json.dumps([f.value if hasattr(f, 'value') else f for f in features])
-        subscription.conversation_quota = plan_config["conversation_quota"]
-        subscription.concurrent_quota = plan_config["concurrent_quota"]
-        subscription.storage_quota = plan_config["storage_quota"]
-        subscription.api_quota = plan_config["api_quota"]
 
         await self.db.commit()
         await self.db.refresh(subscription)
@@ -153,10 +148,6 @@ class SubscriptionService:
 
             subscription.plan_type = new_plan
             subscription.enabled_features = json.dumps([f.value for f in plan_config["features"]])  # 转换为JSON字符串
-            subscription.conversation_quota = plan_config["conversation_quota"]
-            subscription.concurrent_quota = plan_config["concurrent_quota"]
-            subscription.storage_quota = plan_config["storage_quota"]
-            subscription.api_quota = plan_config["api_quota"]
         else:
             # 延期生效
             subscription.pending_plan = new_plan

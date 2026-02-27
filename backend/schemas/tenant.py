@@ -94,10 +94,6 @@ class SubscriptionResponse(SubscriptionBase, TimestampSchema):
     tenant_id: str
     status: str
     enabled_features: list[str]
-    conversation_quota: int
-    concurrent_quota: int
-    storage_quota: int
-    api_quota: int
     start_date: datetime
     expire_at: datetime
     is_trial: bool
@@ -111,31 +107,6 @@ class SubscriptionResponse(SubscriptionBase, TimestampSchema):
         return v
 
 
-# ============ 用量记录 Schema ============
-class UsageRecordResponse(TimestampSchema):
-    """用量记录响应"""
-
-    id: int
-    tenant_id: str
-    record_date: datetime
-    conversation_count: int
-    input_tokens: int
-    output_tokens: int
-    storage_used: float
-    api_calls: int
-    overage_fee: float
-
-
-class QuotaUsageResponse(BaseSchema):
-    """配额使用情况"""
-
-    conversation: dict[str, int | float]
-    storage: dict[str, float]
-    api_call: dict[str, int | float]
-    concurrent: dict[str, int | float]
-    knowledge: dict[str, int | float]
-
-
 # ============ 账单 Schema ============
 class BillResponse(TimestampSchema):
     """账单响应"""
@@ -145,7 +116,6 @@ class BillResponse(TimestampSchema):
     tenant_id: str
     billing_period: str
     base_fee: float
-    overage_fee: float
     discount: float
     adjustment_amount: float
     total_amount: float

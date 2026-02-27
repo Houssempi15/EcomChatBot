@@ -14,7 +14,6 @@ from models.payment import PaymentOrder, OrderStatus
 from models.tenant import Subscription
 from services.billing_service import BillingService
 from services.subscription_service import SubscriptionService, ServiceDegradationManager
-from services.quota_service import QuotaService
 
 logger = logging.getLogger(__name__)
 
@@ -567,116 +566,6 @@ async def check_expiring_subscriptions() -> Dict[str, Any]:
         }
 
 
-@celery_app.task
-async def calculate_usage_charges(tenant_id: str, date: str) -> Dict[str, Any]:
-    """
-    计算用量费用
-
-    Args:
-        tenant_id: 租户ID
-        date: 日期 (格式: YYYY-MM-DD)
-
-    Returns:
-        计算结果
-    """
-    try:
-        logger.info(f"计算用量费用: tenant={tenant_id}, date={date}")
-
-        # 解析日期
-        year, mon, day = map(int, date.split('-'))
-        start_date = datetime(year, mon, day)
-        end_date = start_date + timedelta(days=1) - timedelta(seconds=1)
-
-        async with get_async_session() as db:
-            quota_service = QuotaService(db)
-
-            # 1. 统计当日用量
-            from models.conversation import Conversation, Message
-            from sqlalchemy import func
-
-            # 统计对话数
-            conv_stmt = select(func.count(Conversation.id)).where(
-                and_(
-                    Conversation.tenant_id == tenant_id,
-                    Conversation.created_at >= start_date,
-                    Conversation.created_at <= end_date
-                )
-            )
-            conv_result = await db.execute(conv_stmt)
-            conversation_count = conv_result.scalar() or 0
-
-            # 统计Token消耗
-            token_stmt = select(
-                func.sum(Message.input_tokens) + func.sum(Message.output_tokens)
-            ).join(Conversation).where(
-                and_(
-                    Conversation.tenant_id == tenant_id,
-                    Message.created_at >= start_date,
-                    Message.created_at <= end_date
-                )
-            )
-            token_result = await db.execute(token_stmt)
-            token_usage = token_result.scalar() or 0
-
-            # 2. 检查套餐配额
-            subscription = await quota_service._get_subscription(tenant_id)
-
-            # 计算超额
-            quota_overage = {}
-            charges = 0.0
-
-            # 超额对话计费
-            if subscription.conversation_quota and conversation_count > subscription.conversation_quota:
-                overage = conversation_count - subscription.conversation_quota
-                # 假设每超额1000次对话收费1元
-                charge = (overage / 1000) * 1.0
-                charges += charge
-                quota_overage["conversation"] = {
-                    "used": conversation_count,
-                    "quota": subscription.conversation_quota,
-                    "overage": overage,
-                    "charge": round(charge, 2)
-                }
-
-            # 超额Token计费
-            if subscription.api_quota and token_usage > subscription.api_quota:
-                overage = token_usage - subscription.api_quota
-                # 假设每超额100万Token收费10元
-                charge = (overage / 1000000) * 10.0
-                charges += charge
-                quota_overage["api"] = {
-                    "used": token_usage,
-                    "quota": subscription.api_quota,
-                    "overage": overage,
-                    "charge": round(charge, 2)
-                }
-
-            # 3. 记录超额费用
-            if charges > 0:
-                # TODO: 创建超额使用记录
-                logger.info(f"租户{tenant_id}在{date}超额费用: {charges}元")
-
-            return {
-                "success": True,
-                "tenant_id": tenant_id,
-                "date": date,
-                "charges": round(charges, 2),
-                "usage": {
-                    "conversations": conversation_count,
-                    "tokens": token_usage,
-                },
-                "overage": quota_overage,
-                "message": "用量费用计算完成",
-            }
-
-    except Exception as e:
-        logger.error(f"用量费用计算失败: {e}")
-        return {
-            "success": False,
-            "error": str(e),
-        }
-
-
 @celery_app.task(bind=True, max_retries=3)
 async def process_refund(self, order_id: str, refund_amount: float, reason: str) -> Dict[str, Any]:
     """
@@ -999,25 +888,15 @@ async def handle_subscription_expired(db: AsyncSession, subscription: Subscripti
         # 3. 降级到免费套餐
         subscription.plan_type = "free"
 
-        # 4. 更新配额(使用免费套餐配额)
-        from core.permissions import PLAN_CONFIGS
-        free_config = PLAN_CONFIGS.get("free")
-
-        if free_config:
-            subscription.conversation_quota = free_config.get("conversation_quota", 100)
-            subscription.concurrent_quota = free_config.get("concurrent_quota", 1)
-            subscription.storage_quota = free_config.get("storage_quota", 100)
-            subscription.api_quota = free_config.get("api_quota", 1000)
-
-        # 5. 记录过期时间
+        # 4. 记录过期时间
         subscription.expired_at = datetime.utcnow()
 
         await db.commit()
 
-        # 6. 发送过期通知
+        # 5. 发送过期通知
         await send_subscription_expired_notification(tenant_id, subscription)
 
-        # 7. 触发Webhook事件
+        # 6. 触发Webhook事件
         # from tasks.webhook_tasks import publish_webhook_event
         # publish_webhook_event.delay(
         #     tenant_id=tenant_id,
@@ -1165,68 +1044,3 @@ async def check_single_tenant_degradation(tenant_id: str) -> Dict[str, Any]:
         }
 
 
-@celery_app.task
-async def reset_monthly_quotas() -> Dict[str, Any]:
-    """
-    重置月度配额(每月1号凌晨0点)
-
-    重置所有租户的对话次数和API调用配额
-
-    Returns:
-        重置结果
-    """
-    try:
-        logger.info("开始重置月度配额")
-
-        async with get_async_session() as db:
-            from db import get_redis
-            from models.tenant import Tenant
-
-            redis = await get_redis()
-
-            # 获取所有活跃租户
-            stmt = select(Tenant).where(Tenant.status.in_(["active", "suspended"]))
-            result = await db.execute(stmt)
-            tenants = result.scalars().all()
-
-            reset_count = 0
-            failed_count = 0
-
-            for tenant in tenants:
-                try:
-                    # 删除Redis中的配额记录
-                    # 配额键格式: quota:{tenant_id}:{quota_type}:{period}
-                    tenant_id = tenant.tenant_id
-
-                    # 获取所有相关配额键
-                    keys_pattern_conversation = f"quota:{tenant_id}:conversation:*"
-                    keys_pattern_api = f"quota:{tenant_id}:api_call:*"
-
-                    # 删除上月配额记录
-                    async for key in redis.scan_iter(match=keys_pattern_conversation):
-                        await redis.delete(key)
-
-                    async for key in redis.scan_iter(match=keys_pattern_api):
-                        await redis.delete(key)
-
-                    reset_count += 1
-                    logger.info(f"已重置租户配额: {tenant_id}")
-
-                except Exception as e:
-                    logger.error(f"重置租户配额失败 (tenant={tenant.tenant_id}): {e}")
-                    failed_count += 1
-
-            return {
-                "success": True,
-                "reset_count": reset_count,
-                "failed_count": failed_count,
-                "total_tenants": len(tenants),
-                "message": f"月度配额重置完成: 成功{reset_count}个, 失败{failed_count}个"
-            }
-
-    except Exception as e:
-        logger.error(f"月度配额重置失败: {e}")
-        return {
-            "success": False,
-            "error": str(e),
-        }

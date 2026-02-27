@@ -15,14 +15,13 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Optional, Dict, Any, List, Tuple
 
-from sqlalchemy import select, func, and_, distinct, case
+from sqlalchemy import select, func, and_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import (
     Bill,
     Subscription,
     Tenant,
-    UsageRecord,
     PaymentOrder,
     PaymentTransaction,
 )
@@ -402,39 +401,19 @@ class FinancialReportsService:
         Returns:
             用量概览数据
         """
-        stmt = select(
-            func.sum(UsageRecord.conversation_count).label("total_conversations"),
-            func.sum(UsageRecord.input_tokens).label("total_input_tokens"),
-            func.sum(UsageRecord.output_tokens).label("total_output_tokens"),
-            func.sum(UsageRecord.api_calls).label("total_api_calls"),
-            func.max(UsageRecord.storage_used).label("max_storage"),
-            func.sum(UsageRecord.overage_fee).label("total_overage_fee"),
-            func.count(distinct(UsageRecord.tenant_id)).label("active_tenants"),
-        ).where(
-            and_(
-                UsageRecord.record_date >= start_date.date(),
-                UsageRecord.record_date < end_date.date(),
-            )
-        )
-
-        result = await self.db.execute(stmt)
-        row = result.one()
-
-        total_tokens = (row.total_input_tokens or 0) + (row.total_output_tokens or 0)
-
+        # UsageRecord 表已移除（配额系统移除）
         return {
             "period": {
                 "start": start_date.isoformat(),
                 "end": end_date.isoformat(),
             },
-            "total_conversations": row.total_conversations or 0,
-            "total_tokens": total_tokens,
-            "total_input_tokens": row.total_input_tokens or 0,
-            "total_output_tokens": row.total_output_tokens or 0,
-            "total_api_calls": row.total_api_calls or 0,
-            "max_storage_mb": float(row.max_storage or 0),
-            "total_overage_fee": float(row.total_overage_fee or 0),
-            "active_tenants": row.active_tenants or 0,
+            "total_conversations": 0,
+            "total_tokens": 0,
+            "total_input_tokens": 0,
+            "total_output_tokens": 0,
+            "total_api_calls": 0,
+            "max_storage_mb": 0.0,
+            "active_tenants": 0,
         }
 
     async def get_usage_trend(
@@ -454,37 +433,8 @@ class FinancialReportsService:
         Returns:
             用量趋势数据
         """
-        if granularity == "month":
-            date_trunc = func.date_trunc("month", UsageRecord.record_date)
-        elif granularity == "week":
-            date_trunc = func.date_trunc("week", UsageRecord.record_date)
-        else:
-            date_trunc = UsageRecord.record_date
-
-        stmt = select(
-            date_trunc.label("period"),
-            func.sum(UsageRecord.conversation_count).label("conversations"),
-            func.sum(UsageRecord.input_tokens + UsageRecord.output_tokens).label("tokens"),
-            func.sum(UsageRecord.api_calls).label("api_calls"),
-        ).where(
-            and_(
-                UsageRecord.record_date >= start_date.date(),
-                UsageRecord.record_date < end_date.date(),
-            )
-        ).group_by(date_trunc).order_by(date_trunc)
-
-        result = await self.db.execute(stmt)
-        rows = result.all()
-
-        return [
-            {
-                "period": row.period.isoformat() if hasattr(row.period, 'isoformat') else str(row.period),
-                "conversations": row.conversations or 0,
-                "tokens": row.tokens or 0,
-                "api_calls": row.api_calls or 0,
-            }
-            for row in rows
-        ]
+        # UsageRecord 表已移除（配额系统移除）
+        return []
 
     async def get_top_tenants_by_usage(
         self,
@@ -503,42 +453,8 @@ class FinancialReportsService:
         Returns:
             租户用量排行
         """
-        stmt = select(
-            UsageRecord.tenant_id,
-            func.sum(UsageRecord.conversation_count).label("conversations"),
-            func.sum(UsageRecord.input_tokens + UsageRecord.output_tokens).label("tokens"),
-            func.sum(UsageRecord.overage_fee).label("overage_fee"),
-        ).where(
-            and_(
-                UsageRecord.record_date >= start_date.date(),
-                UsageRecord.record_date < end_date.date(),
-            )
-        ).group_by(UsageRecord.tenant_id).order_by(
-            func.sum(UsageRecord.conversation_count).desc()
-        ).limit(limit)
-
-        result = await self.db.execute(stmt)
-        rows = result.all()
-
-        # 获取租户信息
-        tenant_ids = [row.tenant_id for row in rows]
-        if tenant_ids:
-            tenant_stmt = select(Tenant).where(Tenant.tenant_id.in_(tenant_ids))
-            tenant_result = await self.db.execute(tenant_stmt)
-            tenants = {t.tenant_id: t for t in tenant_result.scalars().all()}
-        else:
-            tenants = {}
-
-        return [
-            {
-                "tenant_id": row.tenant_id,
-                "company_name": tenants.get(row.tenant_id, {}).company_name if row.tenant_id in tenants else "未知",
-                "conversations": row.conversations or 0,
-                "tokens": row.tokens or 0,
-                "overage_fee": float(row.overage_fee or 0),
-            }
-            for row in rows
-        ]
+        # UsageRecord 表已移除（配额系统移除）
+        return []
 
     # ===== 综合报表 =====
 
@@ -700,33 +616,9 @@ class FinancialReportsService:
         Returns:
             CSV内容
         """
-        stmt = select(UsageRecord).where(
-            and_(
-                UsageRecord.record_date >= start_date.date(),
-                UsageRecord.record_date < end_date.date(),
-            )
-        ).order_by(UsageRecord.record_date, UsageRecord.tenant_id)
-
-        result = await self.db.execute(stmt)
-        records = result.scalars().all()
-
+        # UsageRecord 表已移除（配额系统移除），返回空 CSV
         output = io.StringIO()
         writer = csv.writer(output)
-
-        writer.writerow([
-            "日期", "租户ID", "对话数", "输入Token", "输出Token", "API调用", "存储使用(MB)", "超额费用"
-        ])
-
-        for record in records:
-            writer.writerow([
-                record.record_date.isoformat(),
-                record.tenant_id,
-                record.conversation_count,
-                record.input_tokens,
-                record.output_tokens,
-                record.api_calls,
-                str(record.storage_used),
-                str(record.overage_fee),
-            ])
-
+        writer.writerow(["提示"])
+        writer.writerow(["用量记录已停止追踪（配额系统已移除）"])
         return output.getvalue()

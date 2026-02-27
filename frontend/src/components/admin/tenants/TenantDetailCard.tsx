@@ -57,7 +57,7 @@ export default function TenantDetailCard({
             icon={<EditOutlined />}
             onClick={onAdjustQuota}
           >
-            调整配额
+            管理订阅
           </Button>
           <Button
             icon={<KeyOutlined />}

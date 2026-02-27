@@ -28,10 +28,6 @@ class Permission(str, Enum):
     SUBSCRIPTION_UPDATE = "subscription:update"
     SUBSCRIPTION_EXTEND = "subscription:extend"
 
-    # 配额管理
-    QUOTA_READ = "quota:read"
-    QUOTA_ADJUST = "quota:adjust"
-
     # 账单管理
     BILLING_READ = "billing:read"
     BILLING_UPDATE = "billing:update"
@@ -63,14 +59,11 @@ ROLE_PERMISSIONS: dict[AdminRole, list[str]] = {
         Permission.TENANT_UPDATE,
         Permission.SUBSCRIPTION_READ,
         Permission.SUBSCRIPTION_EXTEND,
-        Permission.QUOTA_READ,
-        Permission.QUOTA_ADJUST,
         Permission.STATISTICS_READ,
     ],
     AdminRole.VIEWER: [
         Permission.TENANT_READ,
         Permission.SUBSCRIPTION_READ,
-        Permission.QUOTA_READ,
         Permission.BILLING_READ,
         Permission.STATISTICS_READ,
     ],
@@ -126,10 +119,6 @@ PLAN_CONFIGS = {
         "name": "免费版",
         "base_price": 0,
         "features": [FeatureModule.BASIC_CHAT],
-        "conversation_quota": 100,
-        "concurrent_quota": 5,
-        "storage_quota": 1,  # GB
-        "api_quota": 0,
     },
     "basic": {
         "name": "基础版",
@@ -139,10 +128,6 @@ PLAN_CONFIGS = {
             FeatureModule.ORDER_QUERY,
             FeatureModule.KNOWLEDGE_MANAGE,
         ],
-        "conversation_quota": 2000,
-        "concurrent_quota": 50,
-        "storage_quota": 10,
-        "api_quota": 1000,
     },
     "professional": {
         "name": "专业版",
@@ -156,64 +141,36 @@ PLAN_CONFIGS = {
             FeatureModule.KNOWLEDGE_MANAGE,
             FeatureModule.API_ACCESS,
         ],
-        "conversation_quota": 10000,
-        "concurrent_quota": 200,
-        "storage_quota": 50,
-        "api_quota": 10000,
     },
     "enterprise": {
         "name": "企业版",
         "base_price": 2999,
         "features": [module.value for module in FeatureModule],  # 所有功能
-        "conversation_quota": 50000,
-        "concurrent_quota": 1000,
-        "storage_quota": 200,
-        "api_quota": 100000,
     },
-    # 新订阅套餐（基于时间，无配额限制）
+    # 订阅套餐（基于时间段，无配额限制）
     "trial": {
         "name": "试用版",
         "base_price": 0,
         "features": [module for module in FeatureModule],
-        "conversation_quota": 999999,
-        "concurrent_quota": 999999,
-        "storage_quota": 999999,
-        "api_quota": 999999,
     },
     "monthly": {
         "name": "月付版",
         "base_price": 199,
         "features": [module for module in FeatureModule],
-        "conversation_quota": 999999,
-        "concurrent_quota": 999999,
-        "storage_quota": 999999,
-        "api_quota": 999999,
     },
     "quarterly": {
         "name": "季付版",
         "base_price": 499,
         "features": [module for module in FeatureModule],
-        "conversation_quota": 999999,
-        "concurrent_quota": 999999,
-        "storage_quota": 999999,
-        "api_quota": 999999,
     },
     "semi_annual": {
         "name": "半年付",
         "base_price": 899,
         "features": [module for module in FeatureModule],
-        "conversation_quota": 999999,
-        "concurrent_quota": 999999,
-        "storage_quota": 999999,
-        "api_quota": 999999,
     },
     "annual": {
         "name": "年付版",
         "base_price": 1699,
         "features": [module for module in FeatureModule],
-        "conversation_quota": 999999,
-        "concurrent_quota": 999999,
-        "storage_quota": 999999,
-        "api_quota": 999999,
     },
 }

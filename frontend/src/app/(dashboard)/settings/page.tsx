@@ -8,6 +8,7 @@ import { CopyOutlined, LinkOutlined, DisconnectOutlined, CheckCircleOutlined, Ke
 import { useAuthStore } from '@/store';
 import { platformApi, PlatformConfig } from '@/lib/api/platform';
 import { settingsApi } from '@/lib/api/settings';
+import { subscriptionApi } from '@/lib/api/subscription';
 
 const { Title, Text } = Typography;
 
@@ -15,6 +16,7 @@ export default function SettingsPage() {
   const searchParams = useSearchParams();
   const [selectedMenu, setSelectedMenu] = useState('model');
   const { tenantId } = useAuthStore();
+  const [planName, setPlanName] = useState<string | null>(null);
   const [apiKeyPrefix, setApiKeyPrefix] = useState<string | null>(null);
   const [apiKeyLoading, setApiKeyLoading] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
@@ -32,6 +34,14 @@ export default function SettingsPage() {
     if (status === 'success') message.success('拼多多授权成功！');
     if (status === 'error') message.error('授权失败，请重试');
   }, [searchParams]);
+
+  useEffect(() => {
+    if (selectedMenu === 'tenant') {
+      subscriptionApi.getStatus().then((res) => {
+        if (res.success && res.data) setPlanName(res.data.plan_name);
+      });
+    }
+  }, [selectedMenu]);
 
   useEffect(() => {
     if (selectedMenu === 'platform') {
@@ -201,7 +211,7 @@ export default function SettingsPage() {
                 <Input value={tenantId || ''} disabled />
               </Form.Item>
               <Form.Item label="当前套餐">
-                <Input value="专业版" disabled />
+                <Input value={planName ?? '加载中...'} disabled />
               </Form.Item>
               <Alert
                 message="如需修改租户信息，请联系管理员"

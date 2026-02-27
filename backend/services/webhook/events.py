@@ -27,11 +27,6 @@ class WebhookEventType(str, Enum):
     SUBSCRIPTION_UPDATED = "subscription.updated"
     SUBSCRIPTION_EXPIRED = "subscription.expired"
 
-    # 配额事件
-    QUOTA_WARNING = "quota.warning"
-    QUOTA_EXCEEDED = "quota.exceeded"
-
-
 # 事件类型描述
 EVENT_TYPE_DESCRIPTIONS = {
     WebhookEventType.CONVERSATION_CREATED: {
@@ -65,14 +60,6 @@ EVENT_TYPE_DESCRIPTIONS = {
     WebhookEventType.SUBSCRIPTION_EXPIRED: {
         "name": "订阅过期",
         "description": "当订阅过期时触发",
-    },
-    WebhookEventType.QUOTA_WARNING: {
-        "name": "配额警告",
-        "description": "当配额使用达到警告阈值时触发（默认80%）",
-    },
-    WebhookEventType.QUOTA_EXCEEDED: {
-        "name": "配额超限",
-        "description": "当配额超出限制时触发",
     },
 }
 

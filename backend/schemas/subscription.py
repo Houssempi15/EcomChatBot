@@ -40,12 +40,6 @@ class SubscriptionDetail(BaseModel):
     auto_renew: bool
     is_trial: bool
 
-    # 配额信息
-    conversation_quota: int
-    api_quota: int
-    storage_quota: int
-    concurrent_quota: int
-
     # 功能信息
     enabled_features: List[str]
 

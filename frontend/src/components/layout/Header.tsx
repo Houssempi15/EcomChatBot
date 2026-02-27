@@ -1,12 +1,11 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { Layout, Breadcrumb, Badge, Typography } from 'antd';
+import { Layout, Breadcrumb, Badge } from 'antd';
 import { BellOutlined, HomeOutlined } from '@ant-design/icons';
 import Link from 'next/link';
 
 const { Header: AntHeader } = Layout;
-const { Text } = Typography;
 
 const pathNames: Record<string, string> = {
   dashboard: '仪表盘',
@@ -48,10 +47,6 @@ export default function Header() {
         <Badge count={0} size="small">
           <BellOutlined className="text-lg text-gray-600 cursor-pointer hover:text-blue-600" />
         </Badge>
-        <div className="flex items-center gap-2">
-          <Text type="secondary">API 配额:</Text>
-          <Text className="text-green-600">充足</Text>
-        </div>
       </div>
     </AntHeader>
   );

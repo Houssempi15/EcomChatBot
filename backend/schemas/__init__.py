@@ -55,7 +55,6 @@ from schemas.payment import (
 )
 from schemas.tenant import (
     BillResponse,
-    QuotaUsageResponse,
     SubscriptionCreate,
     SubscriptionResponse,
     SubscriptionUpdate,
@@ -73,7 +72,6 @@ from schemas.tenant import (
     ResetApiKeyResponse,
     TokenRefreshRequest,
     TokenRefreshResponse,
-    UsageRecordResponse,
 )
 from schemas.subscription import (
     SubscribePlanRequest,
@@ -129,8 +127,6 @@ __all__ = [
     "SubscriptionCreate",
     "SubscriptionUpdate",
     "SubscriptionResponse",
-    "UsageRecordResponse",
-    "QuotaUsageResponse",
     "BillResponse",
     # Conversation
     "UserCreate",

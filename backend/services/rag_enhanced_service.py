@@ -40,7 +40,6 @@ class EnhancedRAGService:
         top_k: int = 5,
         rerank_top_k: int = 3,
         use_rerank: bool = True,
-        record_usage: bool = True
     ) -> dict[str, Any]:
         """
         完整的7步RAG查询流程
@@ -50,7 +49,6 @@ class EnhancedRAGService:
             top_k: 初始检索数量
             rerank_top_k: Rerank后保留数量
             use_rerank: 是否使用Rerank
-            record_usage: 是否记录用量
 
         Returns:
             RAG查询结果
@@ -121,15 +119,6 @@ class EnhancedRAGService:
             # Step 7: 后处理
             result["steps"].append("7. 后处理")
             result["response"] = await self._post_process(result["response"])
-
-            # 记录用量
-            if record_usage:
-                await self._record_usage(
-                    query=query,
-                    retrieved_count=len(knowledge_items),
-                    input_tokens=result["usage"].get("input_tokens", 0),
-                    output_tokens=result["usage"].get("output_tokens", 0)
-                )
 
             result["retrieved_docs"] = [
                 {
@@ -258,30 +247,6 @@ class EnhancedRAGService:
 
         return filtered
 
-    async def _record_usage(
-        self,
-        query: str,
-        retrieved_count: int,
-        input_tokens: int,
-        output_tokens: int
-    ) -> None:
-        """记录RAG用量"""
-        from services.usage_service import UsageService
-        from datetime import datetime
-
-        usage_service = UsageService(self.db)
-
-        # 获取或创建今日用量记录
-        today = datetime.utcnow().date()
-        usage = await usage_service.get_or_create_usage(self.tenant_id, today)
-
-        # 更新用量
-        usage.api_calls += 1  # RAG查询算作API调用
-        usage.input_tokens += input_tokens
-        usage.output_tokens += output_tokens
-
-        await self.db.commit()
-
     async def batch_index_with_usage(
         self,
         knowledge_ids: List[str],
@@ -323,15 +288,6 @@ class EnhancedRAGService:
                 except Exception as e:
                     failed_count += 1
                     print(f"索引失败: {kid}, error: {e}")
-
-        # 记录总用量
-        if total_tokens > 0:
-            await self._record_usage(
-                query="batch_index",
-                retrieved_count=success_count,
-                input_tokens=total_tokens,
-                output_tokens=0
-            )
 
         return {
             "total": len(knowledge_ids),

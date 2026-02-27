@@ -19,9 +19,8 @@ from models.payment import (
     TransactionStatus,
     TransactionType,
 )
-from models.quota import QuotaAdjustmentLog
 from models.invoice import Invoice, InvoiceTitle, InvoiceType, InvoiceStatus
-from models.tenant import Bill, Subscription, Tenant, UsageRecord
+from models.tenant import Bill, Subscription, Tenant
 from models.webhook import WebhookConfig, WebhookLog, WebhookEventType
 from models.notification import InAppNotification, NotificationPreference
 from models.platform import PlatformConfig
@@ -41,7 +40,6 @@ __all__ = [
     # Tenant
     "Tenant",
     "Subscription",
-    "UsageRecord",
     "Bill",
     # Conversation
     "User",
@@ -68,8 +66,6 @@ __all__ = [
     "WebhookConfig",
     "WebhookLog",
     "WebhookEventType",
-    # Quota
-    "QuotaAdjustmentLog",
     # Notification
     "InAppNotification",
     "NotificationPreference",

@@ -8,13 +8,12 @@ from typing import Any
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.exceptions import AuthenticationException, QuotaExceededException
+from core.exceptions import AuthenticationException
 from core.security import verify_api_key
 from db.session import get_db
 from services import (
     ConversationChainService,
     ConversationService,
-    UsageService,
 )
 from services.knowledge_service import KnowledgeService
 from services.websocket_service import connection_manager
@@ -235,15 +234,7 @@ async def handle_chat_message(
             output_tokens=result.get("output_tokens", 0),
         )
 
-        # 5. 记录用量
-        usage_service = UsageService(db, tenant_id)
-        await usage_service.record_conversation_usage(
-            conversation_id=conversation_id,
-            input_tokens=result.get("input_tokens", 0),
-            output_tokens=result.get("output_tokens", 0),
-        )
-
-        # 6. 发送回复
+        # 5. 发送回复
         await connection_manager.send_text_message(
             tenant_id=tenant_id,
             conversation_id=conversation_id,
@@ -266,11 +257,6 @@ async def handle_chat_message(
                 "used_rag": use_rag,
                 "sources": result.get("sources", []) if use_rag else None,
             },
-        )
-
-    except QuotaExceededException as e:
-        await connection_manager.send_error(
-            tenant_id, conversation_id, str(e), "QUOTA_EXCEEDED"
         )
 
     except Exception as e:

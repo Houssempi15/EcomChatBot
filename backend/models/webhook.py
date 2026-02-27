@@ -23,10 +23,6 @@ class WebhookEventType(str, Enum):
     # 满意度事件
     SATISFACTION_RATED = "satisfaction.rated"
 
-    # 配额事件
-    QUOTA_WARNING = "quota.warning"
-    QUOTA_EXCEEDED = "quota.exceeded"
-
     # 订阅事件
     SUBSCRIPTION_CREATED = "subscription.created"
     SUBSCRIPTION_RENEWED = "subscription.renewed"

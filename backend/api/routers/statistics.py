@@ -172,84 +172,12 @@ async def get_usage_statistics(
 
     权限：所有管理员可访问
     """
-    from datetime import datetime, timedelta
-    from sqlalchemy import and_, func, select
-    from models import Conversation, Message, Tenant
-    from models.tenant import UsageRecord
-
-    # 计算时间范围
-    now = datetime.utcnow()
-    if period == "day":
-        start_date = now - timedelta(days=1)
-    elif period == "week":
-        start_date = now - timedelta(weeks=1)
-    elif period == "year":
-        start_date = now - timedelta(days=365)
-    else:  # month
-        start_date = now - timedelta(days=30)
-
-    # Token 总消耗 (从 UsageRecord)
-    token_stmt = select(
-        func.sum(UsageRecord.input_tokens + UsageRecord.output_tokens)
-    ).where(UsageRecord.record_date >= start_date)
-    total_tokens = await db.scalar(token_stmt) or 0
-
-    # 存储使用量
-    storage_stmt = select(func.sum(UsageRecord.storage_used)).where(
-        UsageRecord.record_date >= start_date
-    )
-    storage_usage = await db.scalar(storage_stmt) or 0
-
-    # API 调用次数
-    api_stmt = select(func.sum(UsageRecord.api_calls)).where(
-        UsageRecord.record_date >= start_date
-    )
-    api_calls = await db.scalar(api_stmt) or 0
-
-    # 用量趋势 (按天 Token 消耗)
-    trend_stmt = (
-        select(
-            func.date(UsageRecord.record_date).label("date"),
-            func.sum(UsageRecord.input_tokens + UsageRecord.output_tokens).label("value"),
-        )
-        .where(UsageRecord.record_date >= start_date)
-        .group_by(func.date(UsageRecord.record_date))
-        .order_by(func.date(UsageRecord.record_date))
-    )
-    result = await db.execute(trend_stmt)
-    usage_trend = [
-        {"date": str(row.date), "value": int(row.value)}
-        for row in result.all()
-    ]
-
-    # Top 租户 Token 消耗
-    top_tenants_stmt = (
-        select(
-            UsageRecord.tenant_id,
-            Tenant.company_name,
-            func.sum(UsageRecord.input_tokens + UsageRecord.output_tokens).label("tokens"),
-        )
-        .join(Tenant, UsageRecord.tenant_id == Tenant.tenant_id)
-        .where(UsageRecord.record_date >= start_date)
-        .group_by(UsageRecord.tenant_id, Tenant.company_name)
-        .order_by(func.sum(UsageRecord.input_tokens + UsageRecord.output_tokens).desc())
-        .limit(10)
-    )
-    result = await db.execute(top_tenants_stmt)
-    tokens_by_tenant = [
-        {
-            "tenant_id": row.tenant_id,
-            "company_name": row.company_name,
-            "tokens": int(row.tokens),
-        }
-        for row in result.all()
-    ]
-
+    # UsageRecord 表已移除（配额系统移除），返回空统计
     return ApiResponse(data={
-        "total_tokens": int(total_tokens),
-        "storage_usage": float(storage_usage),
-        "api_calls": int(api_calls),
-        "usage_trend": usage_trend,
-        "tokens_by_tenant": tokens_by_tenant,
+        "total_tokens": 0,
+        "storage_usage": 0,
+        "api_calls": 0,
+        "usage_trend": [],
+        "tokens_by_tenant": [],
         "period": period,
     })

@@ -100,11 +100,6 @@ class AuditEventType(str, Enum):
     PAYMENT_FAILED = "payment_failed"
     REFUND_PROCESSED = "refund_processed"
 
-    # 配额管理
-    QUOTA_ADJUSTED = "quota_adjusted"
-    QUOTA_EXCEEDED = "quota_exceeded"
-    QUOTA_WARNING = "quota_warning"
-
     # 安全事件
     SUSPICIOUS_ACTIVITY = "suspicious_activity"
     RATE_LIMIT_EXCEEDED = "rate_limit_exceeded"

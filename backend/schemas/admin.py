@@ -125,14 +125,13 @@ class BatchOperationType(str):
     UPGRADE_PLAN = "upgrade_plan"
     DOWNGRADE_PLAN = "downgrade_plan"
     EXTEND_SERVICE = "extend_service"
-    RESET_QUOTA = "reset_quota"
 
 
 class BatchOperationRequest(BaseSchema):
     """批量操作请求"""
 
     tenant_ids: list[str] = Field(..., min_length=1, max_length=100, description="租户ID列表(最多100个)")
-    operation: str = Field(..., description="操作类型: activate/suspend/delete/upgrade_plan/downgrade_plan/extend_service/reset_quota")
+    operation: str = Field(..., description="操作类型: activate/suspend/delete/upgrade_plan/downgrade_plan/extend_service")
     params: dict | None = Field(None, description="操作参数")
 
 

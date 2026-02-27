@@ -93,6 +93,9 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 60
     rate_limit_burst: int = 10
 
+    # Concurrent Sessions (系统级保护，防止单租户耗尽资源)
+    max_concurrent_sessions_per_tenant: int = 100
+
     # Monitoring
     prometheus_port: int = 9090
     sentry_dsn: str | None = None

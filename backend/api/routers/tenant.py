@@ -18,14 +18,13 @@ from schemas import (
     TenantRegisterRequest,
     TenantRegisterResponse,
     TenantResponse,
-    UsageRecordResponse,
     SubscribePlanRequest,
     ChangePlanRequest,
     SubscriptionDetail,
     ProratedPriceDetail,
     SubscriptionOperationResponse,
 )
-from services import SubscriptionService, TenantService, UsageService
+from services import SubscriptionService, TenantService
 from services.payment_service import PaymentService, PLAN_CONFIG
 from models.payment import PaymentType, SubscriptionType
 
@@ -169,19 +168,6 @@ async def get_subscription_status(
     service = SubscriptionService(db)
     status_info = await service.get_subscription_with_grace(tenant_id)
     return ApiResponse(data=status_info)
-
-
-@router.get("/usage", response_model=ApiResponse[dict])
-async def get_usage(
-    tenant_id: TenantDep,
-    db: DBDep,
-    year: int = Query(..., description="年份"),
-    month: int = Query(..., ge=1, le=12, description="月份"),
-):
-    """获取用量统计"""
-    service = UsageService(db)
-    usage = await service.get_usage_summary(tenant_id, year, month)
-    return ApiResponse(data=usage)
 
 
 # ============ 套餐订阅 API ============

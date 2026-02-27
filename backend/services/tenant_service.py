@@ -87,10 +87,6 @@ class TenantService:
             plan_type="free",
             status="active",
             enabled_features=json.dumps([f.value for f in plan_config["features"]]),  # 转换为JSON字符串
-            conversation_quota=plan_config["conversation_quota"],
-            concurrent_quota=plan_config["concurrent_quota"],
-            storage_quota=plan_config["storage_quota"],
-            api_quota=plan_config["api_quota"],
             start_date=datetime.utcnow(),
             expire_at=datetime.utcnow() + timedelta(days=365),  # 免费套餐1年有效期
             auto_renew=False,
@@ -177,10 +173,6 @@ class TenantService:
             plan_type=tenant_data.initial_plan,
             status="active",
             enabled_features=json.dumps([f.value for f in plan_config["features"]]),  # 转换为JSON字符串
-            conversation_quota=plan_config["conversation_quota"],
-            concurrent_quota=plan_config["concurrent_quota"],
-            storage_quota=plan_config["storage_quota"],
-            api_quota=plan_config["api_quota"],
             start_date=datetime.utcnow(),
             expire_at=datetime.utcnow() + timedelta(days=365),
             auto_renew=False,
@@ -457,39 +449,6 @@ class TenantService:
         
         return {"success": success, "failed": failed}
     
-    async def batch_reset_quota(self, tenant_ids: list[str], redis=None) -> dict:
-        """
-        批量重置配额
-        
-        Args:
-            tenant_ids: 租户ID列表
-            redis: Redis客户端（可选）
-        
-        Returns:
-            {"success": [...], "failed": [...]}
-        """
-        success = []
-        failed = []
-        now = datetime.utcnow()
-        month = now.strftime("%Y%m")
-        
-        for tenant_id in tenant_ids:
-            try:
-                # 验证租户存在
-                await self.get_tenant(tenant_id)
-                
-                # 重置Redis中的配额计数
-                if redis:
-                    for quota_type in ["conversation", "api_call", "message"]:
-                        key = f"quota:{tenant_id}:{quota_type}:{month}"
-                        await redis.delete(key)
-                
-                success.append(tenant_id)
-            except Exception as e:
-                failed.append({"tenant_id": tenant_id, "error": str(e)})
-        
-        return {"success": success, "failed": failed}
-
     async def check_tenant_access(self, tenant_id: str) -> None:
         """
         检查租户访问权限
@@ -579,10 +538,6 @@ class TenantService:
             plan_type="trial",
             status="active",
             enabled_features=json.dumps([f.value if hasattr(f, 'value') else f for f in trial_config["features"]]),
-            conversation_quota=trial_config["conversation_quota"],
-            concurrent_quota=trial_config["concurrent_quota"],
-            storage_quota=trial_config["storage_quota"],
-            api_quota=trial_config["api_quota"],
             start_date=datetime.utcnow(),
             expire_at=datetime.utcnow() + timedelta(days=trial_days),
             auto_renew=False,

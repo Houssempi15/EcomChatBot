@@ -80,15 +80,6 @@ class AdminNotFoundException(ResourceNotFoundException):
 
 
 # 业务逻辑异常
-class QuotaExceededException(AppException):
-    """配额超限异常"""
-
-    def __init__(self, quota_type: str, message: str | None = None):
-        if not message:
-            message = f"{quota_type}配额已用完，请升级套餐"
-        super().__init__(message, "QUOTA_EXCEEDED")
-
-
 class SubscriptionExpiredException(AppException):
     """订阅已过期"""
 

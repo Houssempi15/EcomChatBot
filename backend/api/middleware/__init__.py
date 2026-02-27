@@ -11,15 +11,6 @@ from core import decode_token, InvalidTokenException
 from db import get_db
 from services import TenantService
 
-from .quota import (
-    QuotaType,
-    OverLimitStrategy,
-    QuotaCheckResult,
-    check_quota,
-    check_concurrent_quota,
-    ConcurrentQuotaManager,
-)
-
 from .rate_limit import RateLimitMiddleware, SlidingWindowRateLimiter
 
 # HTTP Bearer Token（auto_error=False 允许同时支持 API Key 回退）
@@ -110,16 +101,6 @@ def generate_csrf_token(session_id: str = None) -> str:
 
 
 __all__ = [
-    "QuotaType",
-    "OverLimitStrategy",
-    "QuotaCheckResult",
-    "check_quota",
-    "check_concurrent_quota",
-    "ConcurrentQuotaManager",
-    "ConversationQuotaDep",
-    "ConcurrentQuotaDep",
-    "StorageQuotaDep",
-    "ApiQuotaDep",
     "RateLimitMiddleware",
     "SlidingWindowRateLimiter",
     "generate_csrf_token",

@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.exceptions import ConversationNotFoundException
 from core.security import generate_conversation_id
 from models import Conversation, Message, User
-from services.usage_service import UsageService
 
 
 class ConversationService:
@@ -19,7 +18,6 @@ class ConversationService:
     def __init__(self, db: AsyncSession, tenant_id: str):
         self.db = db
         self.tenant_id = tenant_id
-        self.usage_service = UsageService(db)
 
     async def get_or_create_user(
         self,
@@ -91,12 +89,6 @@ class ConversationService:
         self.db.add(conversation)
         await self.db.commit()
         await self.db.refresh(conversation)
-
-        # 记录用量
-        await self.usage_service.record_conversation(
-            tenant_id=self.tenant_id,
-            conversation_id=conversation_id,
-        )
 
         return conversation
 

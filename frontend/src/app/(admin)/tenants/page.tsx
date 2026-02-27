@@ -175,7 +175,6 @@ export default function TenantsPage() {
   const batchMenuItems: MenuProps['items'] = [
     { key: 'activate', label: '批量启用', onClick: () => handleBatchOperation('activate') },
     { key: 'suspend', label: '批量停用', onClick: () => handleBatchOperation('suspend') },
-    { key: 'reset_quota', label: '批量重置配额', onClick: () => handleBatchOperation('reset_quota') },
     { type: 'divider' },
     { key: 'delete', label: '批量删除', danger: true, onClick: () => handleBatchOperation('delete') },
   ];

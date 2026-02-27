@@ -10,7 +10,6 @@ import {
   BatchOperationResponse,
   OverdueTenantListResponse,
   AdminPaginatedResponse,
-  TenantUsageDetail,
 } from '@/types/admin';
 
 export const adminTenantsApi = {
@@ -66,17 +65,30 @@ export const adminTenantsApi = {
     return response.data;
   },
 
-  // Adjust quota
-  adjustQuota: async (
-    tenantId: string,
-    quotaType: string,
-    amount: number,
-    reason?: string
-  ): Promise<ApiResponse<Record<string, unknown>>> => {
+  // Extend subscription
+  extendSubscription: async (tenantId: string, days: number): Promise<ApiResponse<Record<string, unknown>>> => {
     const response = await adminApiClient.post<ApiResponse<Record<string, unknown>>>(
-      `/admin/tenants/${tenantId}/adjust-quota`,
+      `/admin/tenants/${tenantId}/extend-subscription`,
       null,
-      { params: { quota_type: quotaType, amount, reason } }
+      { params: { days } }
+    );
+    return response.data;
+  },
+
+  // Suspend subscription
+  suspendSubscription: async (tenantId: string, reason?: string): Promise<ApiResponse<Record<string, unknown>>> => {
+    const response = await adminApiClient.post<ApiResponse<Record<string, unknown>>>(
+      `/admin/tenants/${tenantId}/suspend-subscription`,
+      null,
+      { params: { reason } }
+    );
+    return response.data;
+  },
+
+  // Activate subscription
+  activateSubscription: async (tenantId: string): Promise<ApiResponse<Record<string, unknown>>> => {
+    const response = await adminApiClient.post<ApiResponse<Record<string, unknown>>>(
+      `/admin/tenants/${tenantId}/activate-subscription`
     );
     return response.data;
   },
@@ -119,12 +131,4 @@ export const adminTenantsApi = {
     return response.data;
   },
 
-  // Get tenant usage statistics
-  getUsage: async (tenantId: string, year?: number, month?: number): Promise<ApiResponse<TenantUsageDetail>> => {
-    const response = await adminApiClient.get<ApiResponse<TenantUsageDetail>>(
-      `/admin/tenants/${tenantId}/usage`,
-      { params: { year, month } }
-    );
-    return response.data;
-  },
 };

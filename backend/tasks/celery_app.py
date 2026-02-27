@@ -109,18 +109,6 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(hour=2, minute=0),  # 每天凌晨2点
         "options": {"queue": "billing"}
     },
-    # 每天凌晨5点计算日用量费用
-    "calculate-daily-usage-charges": {
-        "task": "tasks.billing_tasks.calculate_usage_charges",
-        "schedule": crontab(hour=5, minute=0),  # 每天凌晨5点
-        "options": {"queue": "billing"}
-    },
-    # 每月1号凌晨0点重置月度配额
-    "reset-monthly-quota": {
-        "task": "tasks.billing_tasks.reset_monthly_quotas",
-        "schedule": crontab(hour=0, minute=0, day_of_month=1),  # 每月1号凌晨0点
-        "options": {"queue": "billing"}
-    },
     # 每小时刷新即将过期的平台 access_token
     "refresh-platform-tokens": {
         "task": "tasks.platform_tasks.refresh_expiring_tokens",

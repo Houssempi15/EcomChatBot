@@ -565,27 +565,6 @@ class NotificationTemplates:
             },
         }
 
-    @staticmethod
-    def quota_warning(quota_type: str, used: int, total: int, percentage: int) -> Dict[str, str]:
-        """配额预警模板"""
-        return {
-            "title": f"{quota_type}配额预警",
-            "content": f"""
-                <h2>配额使用预警</h2>
-                <p>尊敬的客户，您好！</p>
-                <p>您的 <strong>{quota_type}</strong> 配额使用已达 <strong>{percentage}%</strong>。</p>
-                <ul>
-                    <li>已使用：{used}</li>
-                    <li>配额上限：{total}</li>
-                </ul>
-                <p>请注意控制使用量，或考虑升级套餐以获得更多配额。</p>
-            """,
-            "sms_template": "SMS_QUOTA_WARNING",
-            "sms_params": {
-                "type": quota_type,
-                "percentage": str(percentage),
-            },
-        }
 
     @staticmethod
     def refund_success(order_number: str, amount: float, reason: str) -> Dict[str, str]:

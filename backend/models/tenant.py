@@ -97,9 +97,6 @@ class Tenant(BaseModel):
     payment_orders: Mapped[list["PaymentOrder"]] = relationship(
         "PaymentOrder", back_populates="tenant", lazy="select"
     )
-    usage_records: Mapped[list["UsageRecord"]] = relationship(
-        "UsageRecord", back_populates="tenant", lazy="select"
-    )
     bills: Mapped[list["Bill"]] = relationship(
         "Bill", back_populates="tenant", lazy="select"
     )
@@ -149,18 +146,6 @@ class Subscription(BaseModel):
         Text, comment="功能模块配置(JSON对象)"
     )
 
-    # 配额
-    conversation_quota: Mapped[int] = mapped_column(
-        Integer, nullable=False, comment="对话次数配额"
-    )
-    concurrent_quota: Mapped[int] = mapped_column(
-        Integer, nullable=False, comment="并发会话配额"
-    )
-    storage_quota: Mapped[int] = mapped_column(
-        Integer, nullable=False, comment="存储空间配额(GB)"
-    )
-    api_quota: Mapped[int] = mapped_column(Integer, nullable=False, comment="API调用配额")
-
     # 时间
     start_date: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, comment="订阅开始时间"
@@ -180,44 +165,6 @@ class Subscription(BaseModel):
 
     def __repr__(self) -> str:
         return f"<Subscription {self.tenant_id} - {self.plan_type}>"
-
-
-class UsageRecord(BaseModel):
-    """用量记录表"""
-
-    __tablename__ = "usage_records"
-    __table_args__ = (
-        Index("idx_usage_tenant_date", "tenant_id", "record_date"),
-        {"comment": "用量记录表"},
-    )
-
-    # 租户信息
-    tenant_id: Mapped[str] = mapped_column(
-        String(64), ForeignKey("tenants.tenant_id"), nullable=False, comment="租户ID", index=True
-    )
-    record_date: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, comment="记录日期", index=True
-    )
-
-    # 用量统计
-    conversation_count: Mapped[int] = mapped_column(
-        Integer, default=0, comment="对话次数"
-    )
-    input_tokens: Mapped[int] = mapped_column(Integer, default=0, comment="输入Token数")
-    output_tokens: Mapped[int] = mapped_column(Integer, default=0, comment="输出Token数")
-    storage_used: Mapped[float] = mapped_column(Float, default=0.0, comment="存储使用(GB)")
-    api_calls: Mapped[int] = mapped_column(Integer, default=0, comment="API调用次数")
-
-    # 费用（超出套餐部分）
-    overage_fee: Mapped[float] = mapped_column(
-        Float, default=0.0, comment="超额费用"
-    )
-
-    # 关联关系
-    tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="usage_records")
-
-    def __repr__(self) -> str:
-        return f"<UsageRecord {self.tenant_id} - {self.record_date}>"
 
 
 class Bill(BaseModel):
@@ -244,7 +191,6 @@ class Bill(BaseModel):
 
     # 费用明细
     base_fee: Mapped[float] = mapped_column(Float, default=0.0, comment="基础套餐费")
-    overage_fee: Mapped[float] = mapped_column(Float, default=0.0, comment="超额费用")
     discount: Mapped[float] = mapped_column(Float, default=0.0, comment="折扣")
     adjustment_amount: Mapped[float] = mapped_column(Float, default=0.0, comment="调整金额")
     adjustment_reason: Mapped[str | None] = mapped_column(Text, comment="调整原因")

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Menu, Avatar, Typography, Button, Tooltip } from 'antd';
 import {
@@ -13,6 +14,7 @@ import {
   ExperimentOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/store';
+import { settingsApi } from '@/lib/api/settings';
 
 const { Text } = Typography;
 
@@ -47,7 +49,14 @@ const menuItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { logout, tenantId, userEmail } = useAuthStore();
+  const { logout, userEmail } = useAuthStore();
+  const [companyName, setCompanyName] = useState<string | null>(null);
+
+  useEffect(() => {
+    settingsApi.getTenantInfo().then((res) => {
+      if (res.success && res.data) setCompanyName(res.data.company_name);
+    }).catch(() => {});
+  }, []);
 
   const handleMenuClick = ({ key }: { key: string }) => {
     router.push(key);
@@ -60,61 +69,66 @@ export default function Sidebar() {
 
   return (
     <aside
-      className="fixed left-0 top-0 h-screen w-[200px] z-50 flex flex-col"
-      style={{ background: '#1E1B4B' }}
+      className="fixed left-0 top-0 h-screen w-[200px] z-50"
+      style={{ background: '#001529' }}
     >
-      {/* Logo */}
-      <div className="h-16 flex items-center px-5 border-b" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: '#6366F1' }}>
-            <ShoppingCartOutlined className="text-white text-sm" />
-          </div>
-          <Text strong className="text-white" style={{ fontSize: '0.95rem', letterSpacing: '-0.01em' }}>
+      <div className="flex flex-col h-full">
+        {/* Logo */}
+        <div className="h-16 flex items-center px-6 border-b border-gray-700">
+          <ShoppingCartOutlined className="text-2xl text-blue-400 mr-3" />
+          <Text strong style={{ color: '#fff', fontSize: '1.05rem' }}>
             电商智能客服
           </Text>
         </div>
-      </div>
 
-      {/* Menu */}
-      <div className="flex-1 py-3 px-2">
-        <Menu
-          mode="inline"
-          selectedKeys={[pathname]}
-          onClick={handleMenuClick}
-          items={menuItems}
-          theme="dark"
-          style={{
-            background: 'transparent',
-            borderRight: 'none',
-          }}
-        />
-      </div>
-
-      {/* User Profile */}
-      <div className="p-3 mx-2 mb-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.06)' }}>
-        <div className="flex items-center gap-2.5">
-          <Avatar
-            size={34}
-            icon={<UserOutlined />}
-            style={{ background: '#6366F1', flexShrink: 0 }}
+        {/* Menu */}
+        <div className="flex-1 py-4 overflow-y-auto">
+          <Menu
+            mode="inline"
+            selectedKeys={[pathname]}
+            onClick={handleMenuClick}
+            items={menuItems}
+            theme="dark"
+            style={{ background: 'transparent', borderRight: 'none' }}
           />
-          <div className="flex-1 min-w-0">
-            <Text className="text-white block truncate" style={{ fontSize: '0.8rem', fontWeight: 500 }}>
-              {userEmail || '管理员'}
-            </Text>
-            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem' }} className="block truncate">
-              {tenantId?.slice(0, 8) || 'N/A'}
-            </Text>
+        </div>
+
+        {/* User Profile */}
+        <div className="p-3">
+          <div
+            className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl"
+            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}
+          >
+            <Avatar
+              size={36}
+              style={{ background: '#1677ff', flexShrink: 0, fontWeight: 700, fontSize: '0.9rem' }}
+            >
+              {companyName ? companyName[0].toUpperCase() : <UserOutlined />}
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <Text
+                className="text-white block truncate"
+                style={{ fontSize: '0.82rem', fontWeight: 600, lineHeight: '1.35', letterSpacing: '-0.01em' }}
+              >
+                {companyName || '我的平台'}
+              </Text>
+              <Text
+                className="block truncate"
+                style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.7rem', lineHeight: '1.35' }}
+              >
+                {userEmail || ''}
+              </Text>
+            </div>
+            <Tooltip title="退出登录">
+              <Button
+                type="text"
+                size="small"
+                icon={<LogoutOutlined style={{ color: 'rgba(255,255,255,0.5)' }} />}
+                onClick={handleLogout}
+                className="hover:!bg-white/10 transition-colors flex-shrink-0"
+              />
+            </Tooltip>
           </div>
-          <Tooltip title="退出登录">
-            <Button
-              type="text"
-              size="small"
-              icon={<LogoutOutlined style={{ color: 'rgba(255,255,255,0.4)' }} />}
-              onClick={handleLogout}
-              className="cursor-pointer hover:!bg-white/10 transition-colors"
-            />
-          </Tooltip>
         </div>
       </div>
     </aside>
