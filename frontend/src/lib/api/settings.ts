@@ -55,6 +55,14 @@ export const settingsApi = {
     return response.data;
   },
 
+  // Get model configs filtered by model_type
+  getModelConfigsByType: async (modelType: string): Promise<ApiResponse<ModelConfig[]>> => {
+    const response = await apiClient.get<ApiResponse<ModelConfig[]>>('/models', {
+      params: { model_type: modelType, is_active: true },
+    });
+    return response.data;
+  },
+
   // Get default model config
   getDefaultModel: async (): Promise<ApiResponse<ModelConfig | null>> => {
     const response = await apiClient.get<ApiResponse<ModelConfig | null>>('/models/default');

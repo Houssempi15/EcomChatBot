@@ -247,7 +247,7 @@ services:
       DEBUG: "true"
       ENVIRONMENT: "development"
       LOG_LEVEL: "INFO"
-    command: celery -A tasks.celery_app worker --loglevel=info --concurrency=2
+    command: celery -A tasks.celery_app worker --loglevel=info --concurrency=2 -Q default,notifications,data_processing,billing,webhooks
     networks:
       - ecom-network
     restart: unless-stopped

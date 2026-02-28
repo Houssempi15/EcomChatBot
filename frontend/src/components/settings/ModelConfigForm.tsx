@@ -482,6 +482,50 @@ export default function ModelConfigForm() {
         }
       }
 
+      // 保存图像生成模型配置
+      const imageOptions = (providerDiscoveredModels[selectedProvider] || []).filter(m => m.model_type === 'image_generation').map(m => m.name);
+      const imageModel = cfg.image_generation_model || imageOptions[0] || '';
+      if (imageModel) {
+        const imagePayload = {
+          ...basePayload,
+          model_name: imageModel,
+          model_type: 'image_generation' as ModelType,
+          use_case: 'image_generation',
+          temperature: 0,
+          max_tokens: 0,
+        };
+        if (cfg.image_generation_id) {
+          await settingsApi.updateModelConfig(cfg.image_generation_id, imagePayload);
+        } else {
+          const res = await settingsApi.createModelConfig(imagePayload);
+          if (res.success && res.data) {
+            updateConfig(selectedProvider, { image_generation_id: res.data.id });
+          }
+        }
+      }
+
+      // 保存视频生成模型配置
+      const videoOptions = (providerDiscoveredModels[selectedProvider] || []).filter(m => m.model_type === 'video_generation').map(m => m.name);
+      const videoModel = cfg.video_generation_model || videoOptions[0] || '';
+      if (videoModel) {
+        const videoPayload = {
+          ...basePayload,
+          model_name: videoModel,
+          model_type: 'video_generation' as ModelType,
+          use_case: 'video_generation',
+          temperature: 0,
+          max_tokens: 0,
+        };
+        if (cfg.video_generation_id) {
+          await settingsApi.updateModelConfig(cfg.video_generation_id, videoPayload);
+        } else {
+          const res = await settingsApi.createModelConfig(videoPayload);
+          if (res.success && res.data) {
+            updateConfig(selectedProvider, { video_generation_id: res.data.id });
+          }
+        }
+      }
+
       message.success(`${PLATFORM_CATALOG[selectedProvider].name} 配置已保存`);
     } catch {
       message.error('保存失败，请重试');
@@ -504,7 +548,7 @@ export default function ModelConfigForm() {
   const currentConfig = selectedProvider ? getConfig(selectedProvider) : null;
 
   // 只从已发现模型中取选项（不使用静态目录）
-  const getModelOptions = (type: 'llm' | 'embedding' | 'rerank'): string[] => {
+  const getModelOptions = (type: 'llm' | 'embedding' | 'rerank' | 'image_generation' | 'video_generation'): string[] => {
     if (!selectedProvider) return [];
     return (providerDiscoveredModels[selectedProvider] || [])
       .filter(m => m.model_type === type)
@@ -661,6 +705,8 @@ export default function ModelConfigForm() {
             const llmModels = discoveredModels.filter(m => m.model_type === 'llm');
             const embModels = discoveredModels.filter(m => m.model_type === 'embedding');
             const rerankModels = discoveredModels.filter(m => m.model_type === 'rerank');
+            const imageModels = discoveredModels.filter(m => m.model_type === 'image_generation');
+            const videoModels = discoveredModels.filter(m => m.model_type === 'video_generation');
             return (
               <div className="mb-4 p-3 rounded" style={{ background: '#f8f9fa', border: '1px solid #e8e8e8' }}>
                 <div className="flex items-center justify-between mb-3">
@@ -700,6 +746,26 @@ export default function ModelConfigForm() {
                     <Tag color="orange">重排模型</Tag>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {rerankModels.map(m => (
+                        <Tag key={m.name} style={{ fontSize: 11 }}>{m.name}</Tag>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {imageModels.length > 0 && (
+                  <div className="mb-2">
+                    <Tag color="purple">图像生成</Tag>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {imageModels.map(m => (
+                        <Tag key={m.name} style={{ fontSize: 11 }}>{m.name}</Tag>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {videoModels.length > 0 && (
+                  <div className="mb-2">
+                    <Tag color="magenta">视频生成</Tag>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {videoModels.map(m => (
                         <Tag key={m.name} style={{ fontSize: 11 }}>{m.name}</Tag>
                       ))}
                     </div>
@@ -822,6 +888,50 @@ export default function ModelConfigForm() {
                 <Text type="secondary" style={{ fontSize: 12 }}>当前平台不提供重排模型</Text>
               </div>
             );
+          })()}
+
+          {/* 图像生成模型 */}
+          {(() => {
+            const imageOptions = getModelOptions('image_generation');
+            return imageOptions.length > 0 ? (
+              <div className="mb-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <Tag color="purple">图像生成</Tag>
+                  <Text type="secondary" style={{ fontSize: 12 }}>用于海报和图片生成</Text>
+                </div>
+                <Select
+                  value={currentConfig.image_generation_model || imageOptions[0]}
+                  onChange={v => updateConfig(selectedProvider, { image_generation_model: v })}
+                  style={{ width: '100%' }}
+                >
+                  {imageOptions.map(m => (
+                    <Option key={m} value={m}>{m}</Option>
+                  ))}
+                </Select>
+              </div>
+            ) : null;
+          })()}
+
+          {/* 视频生成模型 */}
+          {(() => {
+            const videoOptions = getModelOptions('video_generation');
+            return videoOptions.length > 0 ? (
+              <div className="mb-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <Tag color="magenta">视频生成</Tag>
+                  <Text type="secondary" style={{ fontSize: 12 }}>用于视频内容生成</Text>
+                </div>
+                <Select
+                  value={currentConfig.video_generation_model || videoOptions[0]}
+                  onChange={v => updateConfig(selectedProvider, { video_generation_model: v })}
+                  style={{ width: '100%' }}
+                >
+                  {videoOptions.map(m => (
+                    <Option key={m} value={m}>{m}</Option>
+                  ))}
+                </Select>
+              </div>
+            ) : null;
           })()}
         </Card>
       )}

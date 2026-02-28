@@ -54,6 +54,7 @@ async def list_model_configs(
     provider: str | None = None,
     use_case: str | None = None,
     is_active: bool | None = None,
+    model_type: str | None = None,
     tenant_id: TenantFlexDep = None,
     db: DBDep = None,
 ):
@@ -62,7 +63,8 @@ async def list_model_configs(
     configs = await service.list_model_configs(
         provider=provider,
         use_case=use_case,
-        is_active=is_active
+        is_active=is_active,
+        model_type=model_type,
     )
     return ApiResponse(data=[ModelConfigResponse.model_validate(c) for c in configs])
 

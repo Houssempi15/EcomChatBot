@@ -12,6 +12,7 @@ import {
 } from '@ant-design/icons';
 import { contentApi, type GenerationTask, type GeneratedAsset, type PromptTemplate } from '@/lib/api/content';
 import { productApi } from '@/lib/api/product';
+import { settingsApi, type ModelConfig } from '@/lib/api/settings';
 import type { Product } from '@/types';
 
 const { TextArea } = Input;
@@ -21,12 +22,14 @@ export default function PosterPage() {
   const [prompt, setPrompt] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<number | undefined>();
   const [selectedTemplate, setSelectedTemplate] = useState<number | undefined>();
+  const [selectedModel, setSelectedModel] = useState<number | undefined>();
   const [generating, setGenerating] = useState(false);
 
   const [tasks, setTasks] = useState<GenerationTask[]>([]);
   const [assets, setAssets] = useState<GeneratedAsset[]>([]);
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [imageModels, setImageModels] = useState<ModelConfig[]>([]);
   const [loading, setLoading] = useState(false);
 
   // 模板管理弹窗
@@ -37,16 +40,18 @@ export default function PosterPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [tasksResp, assetsResp, templatesResp, productsResp] = await Promise.all([
+      const [tasksResp, assetsResp, templatesResp, productsResp, modelsResp] = await Promise.all([
         contentApi.listTasks({ task_type: 'poster', size: 10 }),
         contentApi.listAssets({ asset_type: 'image', size: 20 }),
         contentApi.listTemplates({ template_type: 'poster' }),
         productApi.listProducts({ status: 'active', size: 100 }),
+        settingsApi.getModelConfigsByType('image_generation'),
       ]);
       if (tasksResp.success && tasksResp.data) setTasks(tasksResp.data.items);
       if (assetsResp.success && assetsResp.data) setAssets(assetsResp.data.items);
       if (templatesResp.success && templatesResp.data) setTemplates(templatesResp.data.items);
       if (productsResp.success && productsResp.data) setProducts(productsResp.data.items);
+      if (modelsResp.success && modelsResp.data) setImageModels(modelsResp.data);
     } catch {
       // ignore
     } finally {
@@ -68,6 +73,7 @@ export default function PosterPage() {
         prompt: prompt.trim(),
         product_id: selectedProduct,
         template_id: selectedTemplate,
+        model_config_id: selectedModel,
       });
       if (resp.success) {
         message.success('海报生成任务已创建');
@@ -172,6 +178,21 @@ export default function PosterPage() {
                   />
                   <Button onClick={() => setTemplateModalOpen(true)}>新建模板</Button>
                 </Space>
+              </div>
+
+              <div>
+                <Text strong>图像生成模型（可选）</Text>
+                <Select
+                  placeholder="选择图像生成模型（不选则使用默认）"
+                  allowClear
+                  style={{ width: '100%', marginTop: 8 }}
+                  value={selectedModel}
+                  onChange={setSelectedModel}
+                  options={imageModels.map(m => ({
+                    value: m.id,
+                    label: `${m.provider} / ${m.model_name}${m.is_default ? '（默认）' : ''}`,
+                  }))}
+                />
               </div>
 
               <div>

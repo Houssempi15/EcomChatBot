@@ -18,9 +18,18 @@ def run_generation(task_id: int, tenant_id: str):
 
 
 async def _run_generation(task_id: int, tenant_id: str):
-    from db.session import get_async_session
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+    from core.config import settings
     from services.content_generation.generation_service import GenerationService
 
-    async with get_async_session() as db:
-        service = GenerationService(db, tenant_id)
-        await service.execute_task(task_id)
+    engine = create_async_engine(
+        settings.database_url_str,
+        pool_pre_ping=True,
+    )
+    session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with session_factory() as db:
+            service = GenerationService(db, tenant_id)
+            await service.execute_task(task_id)
+    finally:
+        await engine.dispose()

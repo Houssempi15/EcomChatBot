@@ -123,7 +123,8 @@ class ModelConfigService:
         self,
         provider: str | None = None,
         use_case: str | None = None,
-        is_active: bool | None = None
+        is_active: bool | None = None,
+        model_type: str | None = None,
     ) -> list[ModelConfig]:
         """列出模型配置"""
         conditions = [ModelConfig.tenant_id == self.tenant_id]
@@ -134,6 +135,8 @@ class ModelConfigService:
             conditions.append(ModelConfig.use_case == use_case)
         if is_active is not None:
             conditions.append(ModelConfig.is_active == is_active)
+        if model_type:
+            conditions.append(ModelConfig.model_type == model_type)
 
         stmt = select(ModelConfig).where(*conditions).order_by(
             ModelConfig.priority.desc(),
@@ -426,6 +429,32 @@ class ModelConfigService:
     # 已知的 Qwen Embedding 模型白名单（DashScope /models 接口不返回嵌入模型）
     _QWEN_KNOWN_EMBEDDING_MODELS = ["text-embedding-v4", "text-embedding-v3", "text-embedding-v2", "text-embedding-v1"]
 
+    # 图像生成模型关键词
+    _IMAGE_GEN_KEYWORDS = [
+        "flux", "stable-diffusion", "kolors", "dall-e", "sdxl",
+        "image-edit", "qwen-image", "to-image", "txt2img",
+    ]
+    # 视频生成模型关键词
+    _VIDEO_GEN_KEYWORDS = [
+        "cogvideo", "t2v", "i2v", "wan2", "video",
+    ]
+
+    @staticmethod
+    def _classify_model_type(model_id: str) -> str:
+        """根据模型 ID 推断模型类型"""
+        mid = model_id.lower()
+        if "embedding" in mid:
+            return "embedding"
+        if "rerank" in mid:
+            return "rerank"
+        for kw in ModelConfigService._IMAGE_GEN_KEYWORDS:
+            if kw in mid:
+                return "image_generation"
+        for kw in ModelConfigService._VIDEO_GEN_KEYWORDS:
+            if kw in mid:
+                return "video_generation"
+        return "llm"
+
     @staticmethod
     async def discover_models(
         provider: str,
@@ -462,12 +491,7 @@ class ModelConfigService:
                         mid = m.get("id", "")
                         if not mid:
                             continue
-                        if "embedding" in mid:
-                            mtype = "embedding"
-                        elif "rerank" in mid:
-                            mtype = "rerank"
-                        else:
-                            mtype = "llm"
+                        mtype = ModelConfigService._classify_model_type(mid)
                         result.append({"name": mid, "model_type": mtype})
                         seen_ids.add(mid)
 
@@ -507,10 +531,7 @@ class ModelConfigService:
                         mid = m.get("id", "")
                         if not mid:
                             continue
-                        if "embedding" in mid.lower():
-                            mtype = "embedding"
-                        else:
-                            mtype = "llm"
+                        mtype = ModelConfigService._classify_model_type(mid)
                         result.append({"name": mid, "model_type": mtype})
                     return result
 
@@ -530,12 +551,7 @@ class ModelConfigService:
                         mid = m.get("id", "")
                         if not mid:
                             continue
-                        if "embedding" in mid.lower():
-                            mtype = "embedding"
-                        elif "rerank" in mid.lower():
-                            mtype = "rerank"
-                        else:
-                            mtype = "llm"
+                        mtype = ModelConfigService._classify_model_type(mid)
                         result.append({"name": mid, "model_type": mtype})
                         seen_ids.add(mid)
 
@@ -564,7 +580,7 @@ class ModelConfigService:
                         if "embedContent" in methods:
                             mtype = "embedding"
                         else:
-                            mtype = "llm"
+                            mtype = ModelConfigService._classify_model_type(mid)
                         result.append({"name": mid, "model_type": mtype})
                     return result
 
@@ -583,12 +599,7 @@ class ModelConfigService:
                         mid = m.get("id", "")
                         if not mid:
                             continue
-                        if "embedding" in mid.lower():
-                            mtype = "embedding"
-                        elif "rerank" in mid.lower():
-                            mtype = "rerank"
-                        else:
-                            mtype = "llm"
+                        mtype = ModelConfigService._classify_model_type(mid)
                         result.append({"name": mid, "model_type": mtype})
                     return result
 
