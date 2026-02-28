@@ -3,14 +3,13 @@ import type { ApiResponse, PaginatedResponse } from '@/types';
 
 // ===== 内容生成类型 =====
 
-export interface PromptTemplate {
+export interface ProductPrompt {
   id: number;
   tenant_id: string;
+  product_id: number;
+  prompt_type: 'image' | 'video' | 'title' | 'description';
   name: string;
-  template_type: 'poster' | 'video' | 'title' | 'description';
   content: string;
-  variables: string[] | null;
-  is_default: boolean;
   usage_count: number;
   created_at: string;
   updated_at: string;
@@ -24,7 +23,7 @@ export interface GenerationTask {
   status: 'pending' | 'processing' | 'completed' | 'failed';
   prompt: string;
   model_config_id: number | null;
-  template_id: number | null;
+  prompt_id: number | null;
   params: Record<string, unknown> | null;
   result_count: number;
   error_message: string | null;
@@ -53,45 +52,38 @@ export interface GeneratedAsset {
 // ===== API 函数 =====
 
 export const contentApi = {
-  // ===== 提示词模板 =====
+  // ===== 商品提示词 =====
 
-  async listTemplates(params?: {
-    template_type?: string;
+  async listPrompts(params?: {
+    product_id?: number;
+    prompt_type?: string;
     page?: number;
     size?: number;
-  }): Promise<ApiResponse<PaginatedResponse<PromptTemplate>>> {
-    const { data } = await apiClient.get('/content/templates', { params });
+  }): Promise<ApiResponse<PaginatedResponse<ProductPrompt>>> {
+    const { data } = await apiClient.get('/content/prompts', { params });
     return data;
   },
 
-  async createTemplate(body: {
+  async createPrompt(body: {
+    product_id: number;
+    prompt_type: string;
     name: string;
-    template_type: string;
     content: string;
-    variables?: string[];
-    is_default?: boolean;
-  }): Promise<ApiResponse<PromptTemplate>> {
-    const { data } = await apiClient.post('/content/templates', body);
+  }): Promise<ApiResponse<ProductPrompt>> {
+    const { data } = await apiClient.post('/content/prompts', body);
     return data;
   },
 
-  async getTemplate(templateId: number): Promise<ApiResponse<PromptTemplate>> {
-    const { data } = await apiClient.get(`/content/templates/${templateId}`);
-    return data;
-  },
-
-  async updateTemplate(templateId: number, body: {
+  async updatePrompt(promptId: number, body: {
     name?: string;
     content?: string;
-    variables?: string[];
-    is_default?: boolean;
-  }): Promise<ApiResponse<PromptTemplate>> {
-    const { data } = await apiClient.put(`/content/templates/${templateId}`, body);
+  }): Promise<ApiResponse<ProductPrompt>> {
+    const { data } = await apiClient.put(`/content/prompts/${promptId}`, body);
     return data;
   },
 
-  async deleteTemplate(templateId: number): Promise<ApiResponse<null>> {
-    const { data } = await apiClient.delete(`/content/templates/${templateId}`);
+  async deletePrompt(promptId: number): Promise<ApiResponse<null>> {
+    const { data } = await apiClient.delete(`/content/prompts/${promptId}`);
     return data;
   },
 
@@ -101,7 +93,7 @@ export const contentApi = {
     product_id?: number;
     task_type: string;
     prompt: string;
-    template_id?: number;
+    prompt_id?: number;
     model_config_id?: number;
     params?: Record<string, unknown>;
   }): Promise<ApiResponse<GenerationTask>> {
