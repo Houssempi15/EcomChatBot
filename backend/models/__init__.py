@@ -29,7 +29,6 @@ from models.product import (
     ProductStatus, SyncTarget, SyncType, SyncTaskStatus,
 )
 from models.product_prompt import ProductPrompt, PromptType
-from models.prompt_template import PromptTemplate, TemplateType
 from models.generation import (
     GenerationTask, GeneratedAsset,
     GenerationTaskType, GenerationTaskStatus, AssetType,
@@ -95,9 +94,6 @@ __all__ = [
     "SyncTarget",
     "SyncType",
     "SyncTaskStatus",
-    # Prompt Template
-    "PromptTemplate",
-    "TemplateType",
     # Product Prompt
     "ProductPrompt",
     "PromptType",
