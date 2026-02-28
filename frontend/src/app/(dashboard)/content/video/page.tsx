@@ -10,7 +10,7 @@ import {
   CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined,
   ClockCircleOutlined, PlayCircleOutlined,
 } from '@ant-design/icons';
-import { contentApi, type GenerationTask, type GeneratedAsset, type PromptTemplate } from '@/lib/api/content';
+import { contentApi, type GenerationTask, type GeneratedAsset, type ProductPrompt } from '@/lib/api/content';
 import { productApi } from '@/lib/api/product';
 import { settingsApi, type ModelConfig } from '@/lib/api/settings';
 import type { Product } from '@/types';
@@ -21,14 +21,14 @@ const { Title, Text } = Typography;
 export default function VideoPage() {
   const [prompt, setPrompt] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<number | undefined>();
-  const [selectedTemplate, setSelectedTemplate] = useState<number | undefined>();
+  const [selectedPrompt, setSelectedPrompt] = useState<number | undefined>();
   const [selectedModel, setSelectedModel] = useState<number | undefined>();
   const [imageUrl, setImageUrl] = useState('');
   const [generating, setGenerating] = useState(false);
 
   const [tasks, setTasks] = useState<GenerationTask[]>([]);
   const [assets, setAssets] = useState<GeneratedAsset[]>([]);
-  const [templates, setTemplates] = useState<PromptTemplate[]>([]);
+  const [prompts, setPrompts] = useState<ProductPrompt[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [videoModels, setVideoModels] = useState<ModelConfig[]>([]);
   const [loading, setLoading] = useState(false);
@@ -36,16 +36,14 @@ export default function VideoPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [tasksResp, assetsResp, templatesResp, productsResp, modelsResp] = await Promise.all([
+      const [tasksResp, assetsResp, productsResp, modelsResp] = await Promise.all([
         contentApi.listTasks({ task_type: 'video', size: 10 }),
         contentApi.listAssets({ asset_type: 'video', size: 20 }),
-        contentApi.listTemplates({ template_type: 'video' }),
         productApi.listProducts({ status: 'active', size: 100 }),
         settingsApi.getModelConfigsByType('video_generation'),
       ]);
       if (tasksResp.success && tasksResp.data) setTasks(tasksResp.data.items);
       if (assetsResp.success && assetsResp.data) setAssets(assetsResp.data.items);
-      if (templatesResp.success && templatesResp.data) setTemplates(templatesResp.data.items);
       if (productsResp.success && productsResp.data) setProducts(productsResp.data.items);
       if (modelsResp.success && modelsResp.data) setVideoModels(modelsResp.data);
     } catch {
@@ -56,6 +54,20 @@ export default function VideoPage() {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // 选择商品后加载该商品的 video 类型提示词
+  useEffect(() => {
+    if (selectedProduct) {
+      contentApi.listPrompts({ product_id: selectedProduct, prompt_type: 'video', size: 100 })
+        .then(resp => {
+          if (resp.success && resp.data) setPrompts(resp.data.items);
+        })
+        .catch(() => {});
+    } else {
+      setPrompts([]);
+      setSelectedPrompt(undefined);
+    }
+  }, [selectedProduct]);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -68,7 +80,7 @@ export default function VideoPage() {
         task_type: 'video',
         prompt: prompt.trim(),
         product_id: selectedProduct,
-        template_id: selectedTemplate,
+        prompt_id: selectedPrompt,
         model_config_id: selectedModel,
         params: imageUrl ? { image_url: imageUrl } : undefined,
       });
@@ -113,7 +125,10 @@ export default function VideoPage() {
                   allowClear
                   style={{ width: '100%', marginTop: 8 }}
                   value={selectedProduct}
-                  onChange={setSelectedProduct}
+                  onChange={(val) => {
+                    setSelectedProduct(val);
+                    setSelectedPrompt(undefined);
+                  }}
                   showSearch
                   optionFilterProp="label"
                   options={products.map(p => ({ value: p.id, label: p.title }))}
@@ -145,23 +160,25 @@ export default function VideoPage() {
                 />
               </div>
 
-              <div>
-                <Text strong>使用模板（可选）</Text>
-                <Select
-                  placeholder="选择模板"
-                  allowClear
-                  style={{ width: '100%', marginTop: 8 }}
-                  value={selectedTemplate}
-                  onChange={(val) => {
-                    setSelectedTemplate(val);
-                    if (val) {
-                      const t = templates.find(t => t.id === val);
-                      if (t) setPrompt(t.content);
-                    }
-                  }}
-                  options={templates.map(t => ({ value: t.id, label: t.name }))}
-                />
-              </div>
+              {selectedProduct && prompts.length > 0 && (
+                <div>
+                  <Text strong>使用提示词（可选）</Text>
+                  <Select
+                    placeholder="选择提示词"
+                    allowClear
+                    style={{ width: '100%', marginTop: 8 }}
+                    value={selectedPrompt}
+                    onChange={(val) => {
+                      setSelectedPrompt(val);
+                      if (val) {
+                        const p = prompts.find(p => p.id === val);
+                        if (p) setPrompt(p.content);
+                      }
+                    }}
+                    options={prompts.map(p => ({ value: p.id, label: p.name }))}
+                  />
+                </div>
+              )}
 
               <div>
                 <Text strong>生成提示词</Text>
