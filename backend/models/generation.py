@@ -58,8 +58,8 @@ class GenerationTask(TenantBaseModel):
     model_config_id: Mapped[int | None] = mapped_column(
         Integer, comment="使用的模型配置ID"
     )
-    template_id: Mapped[int | None] = mapped_column(
-        Integer, comment="使用的模板ID"
+    prompt_id: Mapped[int | None] = mapped_column(
+        Integer, comment="使用的提示词ID"
     )
     params: Mapped[dict | None] = mapped_column(
         JSONField, comment="生成参数(JSON)"

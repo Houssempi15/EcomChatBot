@@ -6,10 +6,9 @@ from sqlalchemy import and_, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.generation import GeneratedAsset, GenerationTask, GenerationTaskStatus
-from models.product import Product
 from services.content_generation.image_model_router import ImageModelRouter
 from services.content_generation.video_model_router import VideoModelRouter
-from services.content_generation.prompt_template_service import PromptTemplateService
+from services.content_generation.product_prompt_service import ProductPromptService
 from services.model_config_service import ModelConfigService
 
 logger = logging.getLogger(__name__)
@@ -58,7 +57,7 @@ class GenerationService:
         task_type: str,
         prompt: str,
         product_id: int | None = None,
-        template_id: int | None = None,
+        prompt_id: int | None = None,
         model_config_id: int | None = None,
         params: dict | None = None,
     ) -> GenerationTask:
@@ -66,33 +65,18 @@ class GenerationService:
         # 解析模型配置：未指定时自动回退到默认模型
         model_config_id = await self._resolve_model_config_id(task_type, model_config_id)
 
-        # 如果有模板，渲染提示词
+        # 如果指定了提示词，使用其内容
         final_prompt = prompt
-        if template_id:
-            template_svc = PromptTemplateService(self.db, self.tenant_id)
-            template = await template_svc.get_template(template_id)
-            if template:
-                # 获取商品信息作为变量
-                variables = {}
-                if product_id:
-                    product = (await self.db.execute(
-                        select(Product).where(Product.id == product_id)
-                    )).scalar_one_or_none()
-                    if product:
-                        variables = {
-                            "product_title": product.title,
-                            "product_description": product.description or "",
-                            "product_price": str(product.price),
-                            "product_category": product.category or "",
-                        }
-                final_prompt = PromptTemplateService.render_template(
-                    template.content, variables
-                )
-                # 追加用户自定义 prompt
-                if prompt and prompt != template.content:
+        if prompt_id:
+            prompt_svc = ProductPromptService(self.db, self.tenant_id)
+            product_prompt = await prompt_svc.get_prompt(prompt_id)
+            if product_prompt:
+                final_prompt = product_prompt.content
+                # 如果同时传了手动 prompt，追加为额外要求
+                if prompt and prompt != product_prompt.content:
                     final_prompt = f"{final_prompt}\n\n额外要求：{prompt}"
                 # 增加使用次数
-                template.usage_count += 1
+                await prompt_svc.increment_usage(prompt_id)
 
         task = GenerationTask(
             tenant_id=self.tenant_id,
@@ -101,7 +85,7 @@ class GenerationService:
             status=GenerationTaskStatus.PENDING.value,
             prompt=final_prompt,
             model_config_id=model_config_id,
-            template_id=template_id,
+            prompt_id=prompt_id,
             params=params,
         )
         self.db.add(task)
