@@ -4,15 +4,17 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   Card, Table, Button, Input, Select, Space, Tag, Image,
   message, Modal, Typography, Descriptions, Progress, Tooltip,
-  InputNumber, Switch, Row, Col, Statistic,
+  InputNumber, Switch, Row, Col, Statistic, Popconfirm,
 } from 'antd';
 import {
   SyncOutlined, ShoppingOutlined,
   ClockCircleOutlined,
   LoadingOutlined,
+  FormOutlined, PlusOutlined, EditOutlined, DeleteOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { productApi } from '@/lib/api/product';
+import { contentApi, type ProductPrompt } from '@/lib/api/content';
 import type { Product, SyncTask, SyncSchedule } from '@/types';
 
 const { Search } = Input;
@@ -41,6 +43,17 @@ export default function ProductsPage() {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduleInterval, setScheduleInterval] = useState(60);
   const [scheduleActive, setScheduleActive] = useState(true);
+
+  // 提示词管理弹窗
+  const [promptModalOpen, setPromptModalOpen] = useState(false);
+  const [promptProduct, setPromptProduct] = useState<Product | null>(null);
+  const [productPrompts, setProductPrompts] = useState<ProductPrompt[]>([]);
+  const [promptsLoading, setPromptsLoading] = useState(false);
+  const [promptEditOpen, setPromptEditOpen] = useState(false);
+  const [editingPrompt, setEditingPrompt] = useState<ProductPrompt | null>(null);
+  const [promptFormType, setPromptFormType] = useState<string>('image');
+  const [promptFormName, setPromptFormName] = useState('');
+  const [promptFormContent, setPromptFormContent] = useState('');
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -122,6 +135,87 @@ export default function ProductsPage() {
     deleted: { color: 'red', text: '已删除' },
   };
 
+  const PROMPT_TYPE_OPTIONS = [
+    { value: 'image', label: '图片', color: 'blue' },
+    { value: 'video', label: '视频', color: 'purple' },
+    { value: 'title', label: '标题', color: 'green' },
+    { value: 'description', label: '描述', color: 'orange' },
+  ];
+
+  const openPromptModal = async (product: Product) => {
+    setPromptProduct(product);
+    setPromptModalOpen(true);
+    setPromptsLoading(true);
+    try {
+      const resp = await contentApi.listPrompts({ product_id: product.id, size: 100 });
+      if (resp.success && resp.data) setProductPrompts(resp.data.items);
+    } catch { /* ignore */ }
+    finally { setPromptsLoading(false); }
+  };
+
+  const reloadProductPrompts = async () => {
+    if (!promptProduct) return;
+    setPromptsLoading(true);
+    try {
+      const resp = await contentApi.listPrompts({ product_id: promptProduct.id, size: 100 });
+      if (resp.success && resp.data) setProductPrompts(resp.data.items);
+    } catch { /* ignore */ }
+    finally { setPromptsLoading(false); }
+  };
+
+  const openPromptEdit = (prompt?: ProductPrompt) => {
+    if (prompt) {
+      setEditingPrompt(prompt);
+      setPromptFormType(prompt.prompt_type);
+      setPromptFormName(prompt.name);
+      setPromptFormContent(prompt.content);
+    } else {
+      setEditingPrompt(null);
+      setPromptFormType('image');
+      setPromptFormName('');
+      setPromptFormContent('');
+    }
+    setPromptEditOpen(true);
+  };
+
+  const handleSavePrompt = async () => {
+    if (!promptFormName.trim() || !promptFormContent.trim()) {
+      message.warning('请填写名称和内容');
+      return;
+    }
+    try {
+      if (editingPrompt) {
+        await contentApi.updatePrompt(editingPrompt.id, {
+          name: promptFormName.trim(),
+          content: promptFormContent.trim(),
+        });
+        message.success('更新成功');
+      } else {
+        await contentApi.createPrompt({
+          product_id: promptProduct!.id,
+          prompt_type: promptFormType,
+          name: promptFormName.trim(),
+          content: promptFormContent.trim(),
+        });
+        message.success('创建成功');
+      }
+      setPromptEditOpen(false);
+      reloadProductPrompts();
+    } catch {
+      message.error('操作失败');
+    }
+  };
+
+  const handleDeletePrompt = async (id: number) => {
+    try {
+      await contentApi.deletePrompt(id);
+      message.success('已删除');
+      reloadProductPrompts();
+    } catch {
+      message.error('删除失败');
+    }
+  };
+
   const columns: ColumnsType<Product> = [
     {
       title: '商品图片',
@@ -189,6 +283,21 @@ export default function ProductsPage() {
       width: 160,
       render: (time: string | null) =>
         time ? new Date(time).toLocaleString('zh-CN') : '-',
+    },
+    {
+      title: '操作',
+      key: 'actions',
+      width: 120,
+      render: (_: unknown, record: Product) => (
+        <Button
+          type="link"
+          size="small"
+          icon={<FormOutlined />}
+          onClick={() => openPromptModal(record)}
+        >
+          管理提示词
+        </Button>
+      ),
     },
   ];
 
@@ -407,6 +516,93 @@ export default function ProductsPage() {
               </Text>
             </div>
           )}
+        </Space>
+      </Modal>
+
+      {/* 提示词管理弹窗 */}
+      <Modal
+        title={`管理提示词 — ${promptProduct?.title || ''}`}
+        open={promptModalOpen}
+        onCancel={() => setPromptModalOpen(false)}
+        footer={null}
+        width={700}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => openPromptEdit()}>
+            新增提示词
+          </Button>
+        </div>
+        <Table
+          rowKey="id"
+          dataSource={productPrompts}
+          loading={promptsLoading}
+          pagination={false}
+          size="small"
+          columns={[
+            { title: '名称', dataIndex: 'name', width: 150 },
+            {
+              title: '类型', dataIndex: 'prompt_type', width: 80,
+              render: (type: string) => {
+                const opt = PROMPT_TYPE_OPTIONS.find(o => o.value === type);
+                return <Tag color={opt?.color}>{opt?.label || type}</Tag>;
+              },
+            },
+            { title: '内容', dataIndex: 'content', ellipsis: true },
+            { title: '使用', dataIndex: 'usage_count', width: 60, align: 'center' as const },
+            {
+              title: '操作', key: 'actions', width: 100,
+              render: (_: unknown, record: ProductPrompt) => (
+                <Space>
+                  <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openPromptEdit(record)} />
+                  <Popconfirm title="确定删除？" onConfirm={() => handleDeletePrompt(record.id)}>
+                    <Button type="link" size="small" danger icon={<DeleteOutlined />} />
+                  </Popconfirm>
+                </Space>
+              ),
+            },
+          ]}
+        />
+      </Modal>
+
+      {/* 提示词编辑弹窗 */}
+      <Modal
+        title={editingPrompt ? '编辑提示词' : '新增提示词'}
+        open={promptEditOpen}
+        onCancel={() => setPromptEditOpen(false)}
+        onOk={handleSavePrompt}
+        okText={editingPrompt ? '保存' : '创建'}
+      >
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          {!editingPrompt && (
+            <div>
+              <Text>类型</Text>
+              <Select
+                style={{ width: '100%', marginTop: 4 }}
+                value={promptFormType}
+                onChange={setPromptFormType}
+                options={PROMPT_TYPE_OPTIONS}
+              />
+            </div>
+          )}
+          <div>
+            <Text>名称</Text>
+            <Input
+              placeholder="提示词名称"
+              value={promptFormName}
+              onChange={e => setPromptFormName(e.target.value)}
+              style={{ marginTop: 4 }}
+            />
+          </div>
+          <div>
+            <Text>内容</Text>
+            <Input.TextArea
+              rows={6}
+              placeholder="提示词内容"
+              value={promptFormContent}
+              onChange={e => setPromptFormContent(e.target.value)}
+              style={{ marginTop: 4 }}
+            />
+          </div>
         </Space>
       </Modal>
     </div>
