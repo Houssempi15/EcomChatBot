@@ -7,102 +7,86 @@ from schemas.generation import (
     GenerateRequest, GeneratedAssetResponse,
     GenerationTaskResponse, UploadAssetRequest,
 )
-from schemas.prompt_template import (
-    PromptTemplateCreate, PromptTemplateResponse, PromptTemplateUpdate,
+from schemas.product_prompt import (
+    ProductPromptCreate, ProductPromptResponse, ProductPromptUpdate,
 )
 from services.content_generation.generation_service import GenerationService
-from services.content_generation.prompt_template_service import PromptTemplateService
+from services.content_generation.product_prompt_service import ProductPromptService
 from services.content_generation.asset_upload_service import AssetUploadService
 from tasks.generation_tasks import run_generation
 
 router = APIRouter(prefix="/content", tags=["内容生成"])
 
 
-# ===== 提示词模板 =====
+# ===== 商品提示词 =====
 
-@router.get("/templates", response_model=ApiResponse[PaginatedResponse[PromptTemplateResponse]])
-async def list_templates(
+@router.get("/prompts", response_model=ApiResponse[PaginatedResponse[ProductPromptResponse]])
+async def list_prompts(
     tenant_id: TenantFlexDep,
     db: DBDep,
-    template_type: str | None = None,
+    product_id: int | None = None,
+    prompt_type: str | None = None,
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
 ):
-    """查询提示词模板列表"""
-    service = PromptTemplateService(db, tenant_id)
-    templates, total = await service.list_templates(
-        template_type=template_type, page=page, size=size
+    """查询商品提示词列表"""
+    service = ProductPromptService(db, tenant_id)
+    prompts, total = await service.list_prompts(
+        product_id=product_id, prompt_type=prompt_type, page=page, size=size
     )
     paginated = PaginatedResponse.create(
-        items=templates, total=total, page=page, size=size
+        items=prompts, total=total, page=page, size=size
     )
     return ApiResponse(data=paginated)
 
 
-@router.post("/templates", response_model=ApiResponse[PromptTemplateResponse])
-async def create_template(
-    request: PromptTemplateCreate,
+@router.post("/prompts", response_model=ApiResponse[ProductPromptResponse])
+async def create_prompt(
+    request: ProductPromptCreate,
     tenant_id: TenantFlexDep,
     db: DBDep,
 ):
-    """创建提示词模板"""
-    service = PromptTemplateService(db, tenant_id)
-    template = await service.create_template(
-        name=request.name,
-        template_type=request.template_type,
-        content=request.content,
-        variables=request.variables,
-        is_default=request.is_default,
-    )
-    return ApiResponse(data=template)
-
-
-@router.get("/templates/{template_id}", response_model=ApiResponse[PromptTemplateResponse])
-async def get_template(
-    template_id: int,
-    tenant_id: TenantFlexDep,
-    db: DBDep,
-):
-    """获取模板详情"""
-    service = PromptTemplateService(db, tenant_id)
-    template = await service.get_template(template_id)
-    if not template:
-        return ApiResponse(success=False, error={"code": "NOT_FOUND", "message": "模板不存在"})
-    return ApiResponse(data=template)
-
-
-@router.put("/templates/{template_id}", response_model=ApiResponse[PromptTemplateResponse])
-async def update_template(
-    template_id: int,
-    request: PromptTemplateUpdate,
-    tenant_id: TenantFlexDep,
-    db: DBDep,
-):
-    """更新模板"""
-    service = PromptTemplateService(db, tenant_id)
-    template = await service.update_template(
-        template_id=template_id,
+    """创建商品提示词"""
+    service = ProductPromptService(db, tenant_id)
+    prompt = await service.create_prompt(
+        product_id=request.product_id,
+        prompt_type=request.prompt_type,
         name=request.name,
         content=request.content,
-        variables=request.variables,
-        is_default=request.is_default,
     )
-    if not template:
-        return ApiResponse(success=False, error={"code": "NOT_FOUND", "message": "模板不存在"})
-    return ApiResponse(data=template)
+    return ApiResponse(data=prompt)
 
 
-@router.delete("/templates/{template_id}", response_model=ApiResponse)
-async def delete_template(
-    template_id: int,
+@router.put("/prompts/{prompt_id}", response_model=ApiResponse[ProductPromptResponse])
+async def update_prompt(
+    prompt_id: int,
+    request: ProductPromptUpdate,
     tenant_id: TenantFlexDep,
     db: DBDep,
 ):
-    """删除模板"""
-    service = PromptTemplateService(db, tenant_id)
-    deleted = await service.delete_template(template_id)
+    """更新商品提示词"""
+    service = ProductPromptService(db, tenant_id)
+    prompt = await service.update_prompt(
+        prompt_id=prompt_id,
+        name=request.name,
+        content=request.content,
+    )
+    if not prompt:
+        return ApiResponse(success=False, error={"code": "NOT_FOUND", "message": "提示词不存在"})
+    return ApiResponse(data=prompt)
+
+
+@router.delete("/prompts/{prompt_id}", response_model=ApiResponse)
+async def delete_prompt(
+    prompt_id: int,
+    tenant_id: TenantFlexDep,
+    db: DBDep,
+):
+    """删除商品提示词"""
+    service = ProductPromptService(db, tenant_id)
+    deleted = await service.delete_prompt(prompt_id)
     if not deleted:
-        return ApiResponse(success=False, error={"code": "NOT_FOUND", "message": "模板不存在"})
+        return ApiResponse(success=False, error={"code": "NOT_FOUND", "message": "提示词不存在"})
     return ApiResponse(data=None)
 
 
@@ -120,7 +104,7 @@ async def create_generation(
         task_type=request.task_type,
         prompt=request.prompt,
         product_id=request.product_id,
-        template_id=request.template_id,
+        prompt_id=request.prompt_id,
         model_config_id=request.model_config_id,
         params=request.params,
     )

@@ -11,7 +11,7 @@ class GenerateRequest(BaseModel):
     product_id: int | None = Field(None, description="商品ID")
     task_type: str = Field(..., pattern="^(poster|video|title|description)$", description="任务类型")
     prompt: str = Field(..., min_length=1, description="提示词")
-    template_id: int | None = Field(None, description="模板ID")
+    prompt_id: int | None = Field(None, description="提示词ID")
     model_config_id: int | None = Field(None, description="模型配置ID")
     params: dict | None = Field(None, description="生成参数")
 
@@ -25,7 +25,7 @@ class GenerationTaskResponse(TimestampSchema):
     status: str
     prompt: str
     model_config_id: int | None = None
-    template_id: int | None = None
+    prompt_id: int | None = None
     params: dict | None = None
     result_count: int
     error_message: str | None = None
