@@ -49,6 +49,35 @@ export interface GeneratedAsset {
   updated_at: string;
 }
 
+// ===== Provider 能力类型 =====
+
+export interface SizeOption {
+  value: string;
+  label: string;
+}
+
+export interface ImageProviderCapability {
+  param_mapping: Record<string, string>;
+  supports_batch: boolean;
+  max_batch: number;
+  size_options: SizeOption[];
+  default_size: string;
+  response_parser: string;
+  extra_body: Record<string, unknown>;
+}
+
+export interface DurationOption {
+  value: number;
+  label: string;
+}
+
+export interface VideoProviderCapability {
+  param_mapping: Record<string, string>;
+  supports_image_url: boolean;
+  duration_options: DurationOption[];
+  default_duration: number;
+}
+
 // ===== API 函数 =====
 
 export const contentApi = {
@@ -156,6 +185,17 @@ export const contentApi = {
     platform_config_id: number;
   }): Promise<ApiResponse<{ platform_url: string }>> {
     const { data } = await apiClient.post('/content/assets/upload', body);
+    return data;
+  },
+
+  // ===== Provider 能力 =====
+
+  async getProviderCapabilities<T = Record<string, ImageProviderCapability | VideoProviderCapability>>(
+    taskType: string,
+  ): Promise<ApiResponse<T>> {
+    const { data } = await apiClient.get('/content/provider-capabilities', {
+      params: { task_type: taskType },
+    });
     return data;
   },
 };

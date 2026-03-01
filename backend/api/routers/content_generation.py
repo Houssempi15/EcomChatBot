@@ -14,10 +14,22 @@ from schemas.product_prompt import (
 from services.content_generation.generation_service import GenerationService
 from services.content_generation.product_prompt_service import ProductPromptService
 from services.content_generation.asset_upload_service import AssetUploadService
+from services.content_generation.provider_capabilities import get_capabilities
 from services.storage_service import StorageService
 from tasks.generation_tasks import run_generation
 
 router = APIRouter(prefix="/content", tags=["内容生成"])
+
+
+# ===== Provider 能力 =====
+
+@router.get("/provider-capabilities", response_model=ApiResponse[dict])
+async def get_provider_capabilities(
+    task_type: str = Query(..., description="任务类型: poster / video"),
+):
+    """获取各 provider 的能力描述，供前端动态渲染表单"""
+    caps = get_capabilities(task_type)
+    return ApiResponse(data=caps)
 
 
 # ===== 商品提示词 =====

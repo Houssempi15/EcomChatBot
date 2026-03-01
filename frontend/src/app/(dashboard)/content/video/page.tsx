@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Card, Button, Input, Select, Space, Tag, message,
   Typography, Row, Col, Spin, Empty, List,
@@ -10,7 +10,11 @@ import {
   CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined,
   ClockCircleOutlined, PlayCircleOutlined, CloudUploadOutlined,
 } from '@ant-design/icons';
-import { contentApi, type GenerationTask, type GeneratedAsset, type ProductPrompt } from '@/lib/api/content';
+import {
+  contentApi,
+  type GenerationTask, type GeneratedAsset, type ProductPrompt,
+  type VideoProviderCapability,
+} from '@/lib/api/content';
 import { productApi } from '@/lib/api/product';
 import { settingsApi, type ModelConfig } from '@/lib/api/settings';
 import { usePlatformUpload } from '@/hooks/usePlatformUpload';
@@ -19,7 +23,7 @@ import type { Product } from '@/types';
 const { TextArea } = Input;
 const { Title, Text } = Typography;
 
-const DURATION_OPTIONS = [
+const DEFAULT_DURATION_OPTIONS = [
   { value: 5, label: '5 秒' },
   { value: 10, label: '10 秒' },
 ];
@@ -39,20 +43,35 @@ export default function VideoPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [videoModels, setVideoModels] = useState<ModelConfig[]>([]);
   const [loading, setLoading] = useState(false);
+  const [capabilities, setCapabilities] = useState<Record<string, VideoProviderCapability>>({});
+
+  const currentCaps = useMemo(() => {
+    if (!selectedModel) return null;
+    const model = videoModels.find(m => m.id === selectedModel);
+    if (!model) return null;
+    return capabilities[model.provider] || null;
+  }, [selectedModel, videoModels, capabilities]);
+
+  const durationOptions = useMemo(() => {
+    if (currentCaps) return currentCaps.duration_options.map(o => ({ value: o.value, label: o.label }));
+    return DEFAULT_DURATION_OPTIONS;
+  }, [currentCaps]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [tasksResp, assetsResp, productsResp, modelsResp] = await Promise.all([
+      const [tasksResp, assetsResp, productsResp, modelsResp, capsResp] = await Promise.all([
         contentApi.listTasks({ task_type: 'video', size: 10 }),
         contentApi.listAssets({ asset_type: 'video', size: 20 }),
         productApi.listProducts({ status: 'active', size: 100 }),
         settingsApi.getModelConfigsByType('video_generation'),
+        contentApi.getProviderCapabilities<Record<string, VideoProviderCapability>>('video'),
       ]);
       if (tasksResp.success && tasksResp.data) setTasks(tasksResp.data.items);
       if (assetsResp.success && assetsResp.data) setAssets(assetsResp.data.items);
       if (productsResp.success && productsResp.data) setProducts(productsResp.data.items);
       if (modelsResp.success && modelsResp.data) setVideoModels(modelsResp.data);
+      if (capsResp.success && capsResp.data) setCapabilities(capsResp.data);
     } catch {
       // ignore
     } finally {
@@ -62,7 +81,6 @@ export default function VideoPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // 任务状态轮询
   useEffect(() => {
     const hasPending = tasks.some(t => ['pending', 'processing'].includes(t.status));
     if (!hasPending) return;
@@ -80,6 +98,17 @@ export default function VideoPage() {
       setSelectedPrompt(undefined);
     }
   }, [selectedProduct]);
+
+  const handleModelChange = (val: number | undefined) => {
+    setSelectedModel(val);
+    if (val) {
+      const model = videoModels.find(m => m.id === val);
+      if (model) {
+        const caps = capabilities[model.provider];
+        if (caps) setDuration(caps.default_duration);
+      }
+    }
+  };
 
   const { uploadAsset } = usePlatformUpload(loadData);
 
@@ -133,12 +162,12 @@ export default function VideoPage() {
               <div>
                 <Text strong>视频生成模型（可选）</Text>
                 <Select placeholder="选择视频生成模型（不选则使用默认）" allowClear style={{ width: '100%', marginTop: 8 }}
-                  value={selectedModel} onChange={setSelectedModel}
+                  value={selectedModel} onChange={handleModelChange}
                   options={videoModels.map(m => ({ value: m.id, label: `${m.provider} / ${m.model_name}${m.is_default ? ' (默认)' : ''}` }))} />
               </div>
               <div>
                 <Text strong>视频时长</Text>
-                <Select style={{ width: '100%', marginTop: 8 }} value={duration} onChange={setDuration} options={DURATION_OPTIONS} />
+                <Select style={{ width: '100%', marginTop: 8 }} value={duration} onChange={setDuration} options={durationOptions} />
               </div>
               {selectedProduct && prompts.length > 0 && (
                 <div>
