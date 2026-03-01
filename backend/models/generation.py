@@ -102,7 +102,7 @@ class GeneratedAsset(TenantBaseModel):
         String(32), nullable=False, comment="资产类型(image/video/text)"
     )
     file_url: Mapped[str | None] = mapped_column(
-        String(1024), comment="文件URL(MinIO)"
+        String(1024), comment="文件URL(对象存储)"
     )
     content: Mapped[str | None] = mapped_column(
         Text, comment="文本内容(用于标题/描述)"

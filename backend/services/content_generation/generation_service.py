@@ -133,7 +133,7 @@ class GenerationService:
                 params=task.params,
             )
             for url in urls:
-                # 下载到 MinIO 持久化存储
+                # 下载到 TOS 持久化存储
                 try:
                     object_name = await StorageService.download_and_store(
                         url, "images", self.tenant_id
@@ -141,7 +141,7 @@ class GenerationService:
                     file_url = object_name
                     meta = {"original_url": url}
                 except Exception as e:
-                    logger.warning("MinIO存储失败，使用原始URL: %s", e)
+                    logger.warning("存储失败，使用原始URL: %s", e)
                     file_url = url
                     meta = None
                 asset = GeneratedAsset(
@@ -184,7 +184,7 @@ class GenerationService:
             model_config_id=task.model_config_id,
             params=task.params,
         )
-        # 下载到 MinIO 持久化存储
+        # 下载到 TOS 持久化存储
         try:
             object_name = await StorageService.download_and_store(
                 video_url, "videos", self.tenant_id
@@ -192,7 +192,7 @@ class GenerationService:
             file_url = object_name
             meta = {"original_url": video_url}
         except Exception as e:
-            logger.warning("MinIO存储失败，使用原始URL: %s", e)
+            logger.warning("存储失败，使用原始URL: %s", e)
             file_url = video_url
             meta = None
         asset = GeneratedAsset(
@@ -281,26 +281,17 @@ class GenerationService:
         return (await self.db.execute(stmt)).scalar_one_or_none()
 
     async def delete_asset(self, asset_id: int) -> bool:
-        """删除素材（MinIO 文件 + 数据库记录）"""
+        """删除素材（存储文件 + 数据库记录）"""
         asset = await self.get_asset(asset_id)
         if not asset:
             return False
-        # 删除 MinIO 文件
-        if asset.file_url:
-            obj_name = None
-            if not asset.file_url.startswith("http"):
-                obj_name = asset.file_url
-            else:
-                # 旧数据：从内部 URL 提取 object_name
-                from services.storage_service import MINIO_ENDPOINT, MINIO_BUCKET
-                prefix = f"http://{MINIO_ENDPOINT}/{MINIO_BUCKET}/"
-                if asset.file_url.startswith(prefix):
-                    obj_name = asset.file_url[len(prefix):].split("?")[0]
-            if obj_name:
-                try:
-                    StorageService.delete_object(obj_name)
-                except Exception as e:
-                    logger.warning("删除MinIO文件失败: %s", e)
+        # 删除存储文件
+        if asset.file_url and not asset.file_url.startswith("http"):
+            # 只删除存储在TOS的文件（object_name格式）
+            try:
+                StorageService.delete_object(asset.file_url)
+            except Exception as e:
+                logger.warning("删除存储文件失败: %s", e)
         await self.db.delete(asset)
         await self.db.commit()
         return True

@@ -181,28 +181,14 @@ async def retry_generation_task(
 
 # ===== 素材 =====
 
-def _extract_minio_object_name(file_url: str) -> str | None:
-    """从 MinIO URL（内部或外部地址）中提取 object_name，非 MinIO URL 返回 None"""
-    from services.storage_service import MINIO_ENDPOINT, MINIO_EXTERNAL_ENDPOINT, MINIO_BUCKET
-    for endpoint in (MINIO_ENDPOINT, MINIO_EXTERNAL_ENDPOINT):
-        prefix = f"http://{endpoint}/{MINIO_BUCKET}/"
-        if file_url.startswith(prefix):
-            path = file_url[len(prefix):]
-            return path.split("?")[0]
-    return None
-
-
 def _resolve_asset_urls(assets: list) -> list:
-    """对 MinIO 对象路径生成公开访问 URL"""
+    """为对象路径生成公开访问 URL"""
     for asset in assets:
         if not asset.file_url:
             continue
+        # 如果不是完整URL，则生成预签名URL
         if not asset.file_url.startswith("http"):
             asset.file_url = StorageService.get_public_url(asset.file_url)
-        else:
-            obj_name = _extract_minio_object_name(asset.file_url)
-            if obj_name:
-                asset.file_url = StorageService.get_public_url(obj_name)
     return assets
 
 
@@ -272,14 +258,12 @@ async def download_asset(
     asset = await service.get_asset(asset_id)
     if not asset or not asset.file_url:
         return ApiResponse(success=False, error={"code": "NOT_FOUND", "message": "素材不存在"})
+    # 如果不是完整URL，生成预签名URL
     if not asset.file_url.startswith("http"):
         url = StorageService.get_public_url(asset.file_url)
-        return RedirectResponse(url=url)
-    obj_name = _extract_minio_object_name(asset.file_url)
-    if obj_name:
-        url = StorageService.get_public_url(obj_name)
-        return RedirectResponse(url=url)
-    return RedirectResponse(url=asset.file_url)
+    else:
+        url = asset.file_url
+    return RedirectResponse(url=url)
 
 
 @router.post("/assets/upload", response_model=ApiResponse[dict])

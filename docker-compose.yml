@@ -36,27 +36,6 @@ services:
     networks:
       - ecom-network
 
-  # MinIO 对象存储
-  minio:
-    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
-    container_name: ecom-chatbot-minio
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio_data:/data
-    command: minio server /data --console-address ":9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-    networks:
-      - ecom-network
-
 
   # 数据库初始化服务（只运行一次）
   db-init:
@@ -146,12 +125,14 @@ services:
       DEFAULT_LLM_MODEL: "deepseek-chat"
       # Embedding 维度（text-embedding-v4 输出 1024 维）
       EMBEDDING_DIMENSION: "1024"
-      # MinIO配置
-      MINIO_ENDPOINT: "minio:9000"
-      MINIO_EXTERNAL_ENDPOINT: "localhost:9000"
-      MINIO_ACCESS_KEY: "minioadmin"
-      MINIO_SECRET_KEY: "minioadmin"
-      MINIO_BUCKET: "ecom-chatbot"
+      # 存储配置
+      STORAGE_BACKEND: "tos"
+      # 火山引擎 TOS 配置
+      TOS_ACCESS_KEY: "${TOS_ACCESS_KEY}"
+      TOS_SECRET_KEY: "${TOS_SECRET_KEY}"
+      TOS_ENDPOINT: "${TOS_ENDPOINT:-tos-cn-beijing.volces.com}"
+      TOS_REGION: "${TOS_REGION:-cn-beijing}"
+      TOS_BUCKET: "${TOS_BUCKET:-ecom-chatbot}"
       # 日志配置
       LOG_LEVEL: "INFO"
       LOG_FORMAT: "json"
@@ -211,12 +192,14 @@ services:
       APP_NAME: "电商智能客服系统"
       DEBUG: "true"
       ENVIRONMENT: "development"
-      # MinIO配置
-      MINIO_ENDPOINT: "minio:9000"
-      MINIO_EXTERNAL_ENDPOINT: "localhost:9000"
-      MINIO_ACCESS_KEY: "minioadmin"
-      MINIO_SECRET_KEY: "minioadmin"
-      MINIO_BUCKET: "ecom-chatbot"
+      # 存储配置
+      STORAGE_BACKEND: "tos"
+      # 火山引擎 TOS 配置
+      TOS_ACCESS_KEY: "${TOS_ACCESS_KEY}"
+      TOS_SECRET_KEY: "${TOS_SECRET_KEY}"
+      TOS_ENDPOINT: "${TOS_ENDPOINT:-tos-cn-beijing.volces.com}"
+      TOS_REGION: "${TOS_REGION:-cn-beijing}"
+      TOS_BUCKET: "${TOS_BUCKET:-ecom-chatbot}"
       LOG_LEVEL: "INFO"
     command: celery -A tasks.celery_app worker --loglevel=info --concurrency=2 -Q default,notifications,data_processing,billing,webhooks
     networks:
@@ -226,7 +209,6 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  minio_data:
 
 networks:
   ecom-network:

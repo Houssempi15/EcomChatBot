@@ -75,12 +75,15 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-3-small"
     embedding_dimension: int = 1536
 
-    # MinIO/S3
-    minio_endpoint: str = "localhost:9000"
-    minio_access_key: str = "minioadmin"
-    minio_secret_key: str = "minioadmin"
-    minio_bucket: str = "ecom-chatbot"
-    minio_secure: bool = False
+    # ============ 存储配置 ============
+    storage_backend: str = "tos"  # 固定使用 tos
+
+    # 火山引擎 TOS 配置
+    tos_access_key: str = ""
+    tos_secret_key: str = ""
+    tos_endpoint: str = "tos-cn-beijing.volces.com"
+    tos_region: str = "cn-beijing"
+    tos_bucket: str = "ecom-chatbot"
 
     # RabbitMQ & Celery
     rabbitmq_url: str = "amqp://guest:guest@localhost:5672/"
