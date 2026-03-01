@@ -86,13 +86,14 @@ class TosStorageBackend(StorageBackend):
     def get_public_url(self, object_name: str) -> str:
         """生成预签名 URL (有效期 7 天)"""
         try:
-            url = self.client.pre_signed_url(
-                http_method="GET",
+            from tos.enum import HttpMethodType
+            result = self.client.pre_signed_url(
+                http_method=HttpMethodType.Http_Method_Get,
                 bucket=self.bucket,
                 key=object_name,
                 expires=7 * 24 * 3600,  # 7 天有效期
             )
-            return url
+            return result.signed_url
         except Exception as e:
             logger.error(f"Failed to generate pre-signed URL for {object_name}: {e}")
             # 回退方案: 返回直接 URL (需要 bucket 配置公开读)
