@@ -35,12 +35,10 @@ class MilvusService:
         try:
             connections.connect(
                 alias="default",
-                host=settings.milvus_host,
-                port=settings.milvus_port,
-                user=settings.milvus_user,
-                password=settings.milvus_password,
+                uri=settings.milvus_uri,
+                token=settings.milvus_token,
             )
-            print(f"✓ 已连接到 Milvus: {settings.milvus_host}:{settings.milvus_port}")
+            print(f"✓ 已连接到 Milvus: {settings.milvus_uri}")
         except Exception as e:
             print(f"✗ 连接 Milvus 失败: {e}")
             raise

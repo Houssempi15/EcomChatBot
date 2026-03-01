@@ -83,8 +83,8 @@ async def readiness_check(
 
         connections.connect(
             alias="health_check",
-            host=settings.milvus_host,
-            port=settings.milvus_port,
+            uri=settings.milvus_uri,
+            token=settings.milvus_token,
             timeout=5,
         )
         connections.disconnect("health_check")

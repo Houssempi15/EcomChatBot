@@ -56,10 +56,8 @@ class Settings(BaseSettings):
     openai_base_url: str | None = None
 
     # Milvus
-    milvus_host: str = "localhost"
-    milvus_port: int = 19530
-    milvus_user: str = ""
-    milvus_password: str = ""
+    milvus_uri: str = ""
+    milvus_token: str = ""
 
     # LLM 配置
     openai_api_key: str = ""
