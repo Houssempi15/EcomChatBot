@@ -58,12 +58,22 @@ VIDEO_PROVIDER_CAPABILITIES: dict[str, dict] = {
         "default_duration": 5,
     },
     "siliconflow": {
-        "param_mapping": {"duration": "duration", "image_url": "image_url"},
+        "param_mapping": {
+            "duration": "duration",
+            "image_url": "image",
+            "image_size": "image_size",
+        },
         "supports_image_url": True,
         "duration_options": [
             {"value": 5, "label": "5 秒"},
         ],
         "default_duration": 5,
+        "image_size_options": [
+            {"value": "1280x720", "label": "1280x720 (横版)"},
+            {"value": "720x1280", "label": "720x1280 (竖版)"},
+            {"value": "960x960", "label": "960x960 (正方形)"},
+        ],
+        "default_image_size": "1280x720",
     },
 }
 
