@@ -169,7 +169,21 @@ npm install
 npm run dev                    # 访问 http://localhost:3000
 ```
 
-详细部署说明：[快速开始指南](./docs/QUICKSTART.md) | [生产部署指南](./docs/README-DEPLOYMENT.md) | [Jenkins CI/CD](./docs/JENKINS_SETUP.md)
+详细部署说明：[快速开始指南](./docs/QUICKSTART.md) | [生产部署指南](./docs/README-DEPLOYMENT.md) | [域名部署指南](./docs/DEPLOYMENT.md) | [Jenkins CI/CD](./docs/JENKINS_SETUP.md)
+
+### 域名部署（HTTPS）
+
+如果您已有域名并完成备案，可以使用以下命令快速部署 HTTPS 服务：
+
+```bash
+# 1. 获取 SSL 证书
+sudo ./scripts/get-ssl-cert.sh
+
+# 2. 部署应用
+sudo ./scripts/deploy-domain.sh
+```
+
+详细说明：[域名部署指南](./docs/DEPLOYMENT.md) | [快速参考](./docs/DEPLOYMENT_QUICK_REF.md)
 
 ## 📁 项目结构
 
