@@ -54,6 +54,7 @@ async def list_conversations(
     db: DBDep,
     user_id: str | None = None,
     status: str | None = None,
+    platform_type: str | None = None,
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
 ):
@@ -62,6 +63,7 @@ async def list_conversations(
     conversations, total = await service.list_conversations(
         user_external_id=user_id,
         status=status,
+        platform_type=platform_type,
         page=page,
         size=size,
     )

@@ -57,6 +57,9 @@ if [ -n "$POSTGRES_HOST" ] && [ -n "$POSTGRES_USER" ] && [ -n "$POSTGRES_DB" ]; 
         -- 清理孤立表（迁移 012 删除）
         DROP TABLE IF EXISTS usage_records;
         DROP TABLE IF EXISTS quota_adjustment_logs;
+        -- 支持多平台对接（迁移 020）
+        DROP INDEX IF EXISTS idx_platform_config_tenant_type;
+        CREATE INDEX IF NOT EXISTS idx_platform_config_tenant_type_shop ON platform_configs (tenant_id, platform_type, shop_id);
     " 2>/dev/null && echo "✅ Schema 同步完成" || echo "⚠️  Schema 同步跳过"
 fi
 

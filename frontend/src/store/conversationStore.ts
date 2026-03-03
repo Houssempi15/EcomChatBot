@@ -18,11 +18,12 @@ interface ConversationState {
     pages: number;
   };
   statusFilter: StatusFilter;
+  platformFilter: string | undefined;
   wsStatus: WsStatus;
   streamingMessageId: string | null;
   ragSources: KnowledgeSearchResult[];
 
-  fetchConversations: (params?: { status?: string; page?: number }) => Promise<void>;
+  fetchConversations: (params?: { status?: string; platform_type?: string; page?: number }) => Promise<void>;
   fetchConversation: (conversationId: string) => Promise<void>;
   selectConversation: (conversationId: string) => Promise<void>;
   addMessage: (message: Message) => void;
@@ -30,6 +31,7 @@ interface ConversationState {
   closeConversation: (conversationId: string) => Promise<void>;
   clearCurrentConversation: () => void;
   setStatusFilter: (status: StatusFilter) => void;
+  setPlatformFilter: (platform: string | undefined) => void;
   setWsStatus: (status: WsStatus) => void;
   startStreamingMessage: (conversationId: string) => string;
   appendStreamChunk: (tempId: string, chunk: string) => void;
@@ -52,6 +54,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
     pages: 0,
   },
   statusFilter: 'all',
+  platformFilter: undefined,
   wsStatus: 'disconnected',
   streamingMessageId: null,
   ragSources: [],
@@ -59,12 +62,14 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   fetchConversations: async (params) => {
     set({ isLoading: true, error: null });
     try {
-      const { statusFilter, pagination } = get();
+      const { statusFilter, platformFilter, pagination } = get();
       const statusParam = params?.status ?? (statusFilter !== 'all' ? statusFilter : undefined);
+      const platformParam = params?.platform_type ?? platformFilter;
       const response = await conversationApi.list({
         page: params?.page || pagination.page,
         size: pagination.size,
         status: statusParam,
+        platform_type: platformParam,
       });
 
       if (response.success && response.data) {
@@ -145,6 +150,10 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
 
   setStatusFilter: (status: StatusFilter) => {
     set({ statusFilter: status });
+  },
+
+  setPlatformFilter: (platform: string | undefined) => {
+    set({ platformFilter: platform });
   },
 
   setWsStatus: (status: WsStatus) => {

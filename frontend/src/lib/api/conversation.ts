@@ -18,6 +18,7 @@ export const conversationApi = {
   list: async (params?: {
     user_id?: string;
     status?: string;
+    platform_type?: string;
     page?: number;
     size?: number;
   }): Promise<ApiResponse<PaginatedResponse<Conversation>>> => {

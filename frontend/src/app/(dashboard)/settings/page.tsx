@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Row, Col, Card, Typography, message, Alert, Form, Input, Button, Slider, Spin, Steps, Modal } from 'antd';
+import { Row, Col, Card, Typography, message, Alert, Form, Input, Button, Spin, Modal, Tabs } from 'antd';
 import { SettingsMenu, ModelConfigForm, SubscriptionPanel } from '@/components/settings';
-import { CopyOutlined, LinkOutlined, DisconnectOutlined, CheckCircleOutlined, KeyOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { CopyOutlined, KeyOutlined, ExclamationCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import { useAuthStore } from '@/store';
 import { platformApi, PlatformConfig } from '@/lib/api/platform';
 import { settingsApi } from '@/lib/api/settings';
 import { subscriptionApi } from '@/lib/api/subscription';
+import PlatformConfigCard from '@/components/settings/PlatformConfigCard';
+import PlatformConfigModal from '@/components/settings/PlatformConfigModal';
 
 const { Title, Text } = Typography;
 
@@ -22,9 +24,11 @@ export default function SettingsPage() {
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [newApiKeyModal, setNewApiKeyModal] = useState(false);
   const [newApiKey, setNewApiKey] = useState('');
-  const [pddConfig, setPddConfig] = useState<PlatformConfig | null>(null);
+  const [platformConfigs, setPlatformConfigs] = useState<PlatformConfig[]>([]);
   const [pddLoading, setPddLoading] = useState(false);
-  const [pddForm] = Form.useForm();
+  const [selectedPlatform, setSelectedPlatform] = useState('pinduoduo');
+  const [editingConfig, setEditingConfig] = useState<PlatformConfig | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   // Handle URL params (e.g. after OAuth callback)
   useEffect(() => {
@@ -45,23 +49,21 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (selectedMenu === 'platform') {
-      setPddLoading(true);
-      platformApi.getConfigs().then((res) => {
-        if (res.success && res.data) {
-          const cfg = res.data.find((c) => c.platform_type === 'pinduoduo') ?? null;
-          setPddConfig(cfg);
-          if (cfg) {
-            pddForm.setFieldsValue({
-              app_key: cfg.app_key,
-              auto_reply_threshold: Math.round(cfg.auto_reply_threshold * 100),
-              human_takeover_message: cfg.human_takeover_message ?? '',
-            });
-          }
-        }
-      }).finally(() => setPddLoading(false));
+      loadPlatformConfigs();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMenu]);
+
+  const loadPlatformConfigs = async () => {
+    setPddLoading(true);
+    try {
+      const res = await platformApi.getConfigs();
+      if (res.success && res.data) {
+        setPlatformConfigs(res.data);
+      }
+    } finally {
+      setPddLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (selectedMenu === 'api') {
@@ -236,115 +238,80 @@ export default function SettingsPage() {
       case 'subscription':
         return <SubscriptionPanel />;
       case 'platform': {
-        // Compute current step: 0=no config, 1=saved not connected, 2=connected
-        const pddStep = !pddConfig ? 0 : pddConfig.is_active ? 2 : 1;
-        const webhookUrl = typeof window !== 'undefined'
-          ? `${window.location.origin}/api/v1/platform/pinduoduo/webhook`
-          : '/api/v1/platform/pinduoduo/webhook';
+        const pddConfigs = platformConfigs.filter(c => c.platform_type === 'pinduoduo');
 
         return (
           <>
-            <Title level={5} className="mb-4">平台对接 - 拼多多</Title>
+            <Title level={5} className="mb-4">平台对接管理</Title>
+
+            <Tabs
+              activeKey={selectedPlatform}
+              onChange={setSelectedPlatform}
+              items={[
+                { key: 'pinduoduo', label: '拼多多' },
+                { key: 'taobao', label: '淘宝（即将支持）', disabled: true },
+                { key: 'jd', label: '京东（即将支持）', disabled: true },
+              ]}
+            />
+
             <Spin spinning={pddLoading}>
-              <Steps
-                current={pddStep}
-                className="mb-6"
-                items={[
-                  { title: '填写凭证' },
-                  { title: 'OAuth 授权' },
-                  { title: '配置 Webhook' },
-                ]}
-              />
-
-              {/* Step 0 & 1: Credentials form */}
-              {pddStep < 2 && (
-                <Form form={pddForm} layout="vertical" onFinish={async (values) => {
-                  try {
-                    const res = await platformApi.upsertConfig('pinduoduo', {
-                      app_key: values.app_key,
-                      app_secret: values.app_secret,
-                      auto_reply_threshold: values.auto_reply_threshold / 100,
-                      human_takeover_message: values.human_takeover_message || null,
-                    });
-                    if (res.success) {
-                      setPddConfig(res.data);
-                      message.success('配置已保存，请点击「连接拼多多」完成授权');
-                    }
-                  } catch {
-                    message.error('保存失败');
-                  }
-                }}>
-                  <Form.Item label="App Key" name="app_key" rules={[{ required: true }]}>
-                    <Input placeholder="拼多多开放平台 App Key" />
-                  </Form.Item>
-                  <Form.Item label="App Secret" name="app_secret" rules={[{ required: true }]}>
-                    <Input.Password placeholder="拼多多开放平台 App Secret" />
-                  </Form.Item>
-                  <details className="mb-4">
-                    <summary className="cursor-pointer text-gray-500 text-sm mb-2">高级配置（可选）</summary>
-                    <Form.Item label="自动回复置信度阈值" name="auto_reply_threshold" initialValue={70}>
-                      <Slider min={0} max={100} marks={{ 0: '0%', 50: '50%', 70: '70%', 100: '100%' }} />
-                    </Form.Item>
-                    <Form.Item label="转人工提示语" name="human_takeover_message">
-                      <Input.TextArea placeholder="例如：您好，正在为您转接人工客服，请稍候..." rows={2} />
-                    </Form.Item>
-                  </details>
-                  <Form.Item>
-                    <Button type="primary" htmlType="submit" className="mr-2">保存配置</Button>
-                    {pddStep === 1 && (
-                      <Button
-                        icon={<LinkOutlined />}
-                        onClick={() => {
-                          const redirectUri = `${window.location.origin}/api/v1/platform/pinduoduo/callback`;
-                          window.location.href = platformApi.getAuthUrl(pddConfig!.app_key, redirectUri);
-                        }}
-                      >
-                        连接拼多多
-                      </Button>
-                    )}
-                  </Form.Item>
-                </Form>
-              )}
-
-              {/* Step 2: Connected */}
-              {pddStep === 2 && (
+              {selectedPlatform === 'pinduoduo' && (
                 <div>
-                  <Alert
-                    icon={<CheckCircleOutlined />}
-                    message={`已连接 · ${pddConfig?.shop_name || pddConfig?.shop_id || '店铺'}`}
-                    type="success"
-                    showIcon
-                    className="mb-4"
-                  />
-                  <div className="mb-4">
-                    <div className="text-sm text-gray-500 mb-1">Webhook 地址（填入拼多多开放平台）：</div>
-                    <div className="flex items-center gap-2">
-                      <Input value={webhookUrl} readOnly style={{ fontFamily: 'monospace' }} />
-                      <Button
-                        icon={<CopyOutlined />}
-                        onClick={() => {
-                          navigator.clipboard.writeText(webhookUrl);
-                          message.success('已复制');
+                  {pddConfigs.map(config => (
+                    <Card key={config.id} className="mb-4">
+                      <PlatformConfigCard
+                        config={config}
+                        onEdit={() => setEditingConfig(config)}
+                        onDelete={async () => {
+                          Modal.confirm({
+                            title: '确认删除',
+                            content: '删除后将断开与该店铺的连接，确认继续？',
+                            okText: '确认',
+                            cancelText: '取消',
+                            onOk: async () => {
+                              try {
+                                await platformApi.disconnect(config.id);
+                                message.success('已删除');
+                                loadPlatformConfigs();
+                              } catch {
+                                message.error('删除失败');
+                              }
+                            },
+                          });
                         }}
-                      >
-                        复制
-                      </Button>
-                    </div>
-                  </div>
+                        onConnect={() => {
+                          const redirectUri = `${window.location.origin}/api/v1/platform/pinduoduo/callback`;
+                          window.location.href = platformApi.getAuthUrl(config.id, redirectUri);
+                        }}
+                      />
+                    </Card>
+                  ))}
+
                   <Button
-                    danger
-                    icon={<DisconnectOutlined />}
-                    onClick={async () => {
-                      await platformApi.disconnect('pinduoduo');
-                      setPddConfig((prev) => prev ? { ...prev, is_active: false } : null);
-                      message.success('已断开连接');
-                    }}
+                    type="dashed"
+                    block
+                    icon={<PlusOutlined />}
+                    onClick={() => setShowAddModal(true)}
                   >
-                    断开连接
+                    添加拼多多店铺
                   </Button>
                 </div>
               )}
             </Spin>
+
+            <PlatformConfigModal
+              visible={showAddModal || !!editingConfig}
+              config={editingConfig}
+              onClose={() => {
+                setShowAddModal(false);
+                setEditingConfig(null);
+              }}
+              onSuccess={() => {
+                loadPlatformConfigs();
+                setShowAddModal(false);
+                setEditingConfig(null);
+              }}
+            />
           </>
         );
       }

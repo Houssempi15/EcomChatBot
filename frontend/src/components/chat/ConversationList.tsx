@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { Input, List, Tag, Typography, Spin, Segmented, Pagination } from 'antd';
+import { Input, List, Tag, Typography, Spin, Segmented, Pagination, Select } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import { Conversation } from '@/types';
 
@@ -18,6 +18,8 @@ interface ConversationListProps {
   onSearchChange: (value: string) => void;
   statusFilter?: StatusFilter;
   onStatusFilterChange?: (status: StatusFilter) => void;
+  platformFilter?: string;
+  onPlatformFilterChange?: (platform: string | undefined) => void;
   pagination?: { page: number; total: number; size: number };
   onPageChange?: (page: number) => void;
 }
@@ -44,6 +46,8 @@ function ConversationList({
   onSearchChange,
   statusFilter = 'all',
   onStatusFilterChange,
+  platformFilter,
+  onPlatformFilterChange,
   pagination,
   onPageChange,
 }: ConversationListProps) {
@@ -55,6 +59,24 @@ function ConversationList({
   const formatUserId = (id: string) => {
     if (id.startsWith('VIP')) return id;
     return `访客 #${id.slice(-4)}`;
+  };
+
+  const getPlatformLabel = (platform: string): string => {
+    const labels: Record<string, string> = {
+      pinduoduo: '拼多多',
+      taobao: '淘宝',
+      jd: '京东',
+    };
+    return labels[platform] || platform;
+  };
+
+  const getPlatformColor = (platform: string): string => {
+    const colors: Record<string, string> = {
+      pinduoduo: 'orange',
+      taobao: 'red',
+      jd: 'blue',
+    };
+    return colors[platform] || 'default';
   };
 
   return (
@@ -75,6 +97,21 @@ function ConversationList({
             options={filterOptions}
             value={statusFilter}
             onChange={(v) => onStatusFilterChange(v as StatusFilter)}
+          />
+        )}
+        {onPlatformFilterChange && (
+          <Select
+            placeholder="全部平台"
+            allowClear
+            style={{ width: '100%' }}
+            size="small"
+            value={platformFilter}
+            onChange={onPlatformFilterChange}
+            options={[
+              { value: 'pinduoduo', label: '拼多多' },
+              { value: 'taobao', label: '淘宝' },
+              { value: 'jd', label: '京东' },
+            ]}
           />
         )}
       </div>
@@ -101,9 +138,16 @@ function ConversationList({
                   onClick={() => onSelect(item.conversation_id)}
                 >
                   <div className="flex justify-between items-center mb-1">
-                    <Text strong className="text-sm">
-                      {formatUserId(item.user_external_id)}
-                    </Text>
+                    <div className="flex items-center gap-2">
+                      {item.platform_type && (
+                        <Tag color={getPlatformColor(item.platform_type)} className="text-xs">
+                          {getPlatformLabel(item.platform_type)}
+                        </Tag>
+                      )}
+                      <Text strong className="text-sm">
+                        {formatUserId(item.user_external_id)}
+                      </Text>
+                    </div>
                     <Text type="secondary" className="text-xs">
                       {item.last_message_at
                         ? formatTime(item.last_message_at)

@@ -14,6 +14,7 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { productApi } from '@/lib/api/product';
+import { platformApi, type PlatformConfig } from '@/lib/api/platform';
 import { contentApi, type ProductPrompt } from '@/lib/api/content';
 import type { Product, SyncTask, SyncSchedule } from '@/types';
 
@@ -21,6 +22,10 @@ const { Search } = Input;
 const { Text, Title } = Typography;
 
 export default function ProductsPage() {
+  // 平台配置
+  const [platformConfigs, setPlatformConfigs] = useState<PlatformConfig[]>([]);
+  const [selectedConfigId, setSelectedConfigId] = useState<number | undefined>();
+
   // 商品列表状态
   const [products, setProducts] = useState<Product[]>([]);
   const [total, setTotal] = useState(0);
@@ -61,6 +66,7 @@ export default function ProductsPage() {
       const resp = await productApi.listProducts({
         keyword: keyword || undefined,
         status: statusFilter,
+        platform_config_id: selectedConfigId,
         page,
         size,
       });
@@ -73,7 +79,7 @@ export default function ProductsPage() {
     } finally {
       setLoading(false);
     }
-  }, [keyword, statusFilter, page, size]);
+  }, [keyword, statusFilter, selectedConfigId, page, size]);
 
   const loadSyncTasks = useCallback(async () => {
     try {
@@ -87,6 +93,19 @@ export default function ProductsPage() {
   }, []);
 
   useEffect(() => {
+    // Load platform configs
+    platformApi.getConfigs().then(res => {
+      if (res.success && res.data) {
+        const activeConfigs = res.data.filter(c => c.is_active);
+        setPlatformConfigs(activeConfigs);
+        if (activeConfigs.length > 0 && !selectedConfigId) {
+          setSelectedConfigId(activeConfigs[0].id);
+        }
+      }
+    });
+  }, [selectedConfigId]);
+
+  useEffect(() => {
     loadProducts();
   }, [loadProducts]);
 
@@ -95,10 +114,13 @@ export default function ProductsPage() {
   }, [loadSyncTasks]);
 
   const handleSync = async (syncType: 'full' | 'incremental') => {
+    if (!selectedConfigId) {
+      message.error('请先选择店铺');
+      return;
+    }
     setSyncing(true);
     try {
-      // TODO: 支持多平台选择，当前使用第一个平台
-      const resp = await productApi.triggerSync(1, syncType);
+      const resp = await productApi.triggerSync(selectedConfigId, syncType);
       if (resp.success) {
         message.success('同步任务已创建');
         loadSyncTasks();
@@ -113,9 +135,12 @@ export default function ProductsPage() {
   };
 
   const handleSaveSchedule = async () => {
+    if (!selectedConfigId) {
+      message.error('请先选择店铺');
+      return;
+    }
     try {
-      // TODO: 支持多平台选择
-      const resp = await productApi.updateSyncSchedule(1, {
+      const resp = await productApi.updateSyncSchedule(selectedConfigId, {
         interval_minutes: scheduleInterval,
         is_active: scheduleActive,
       });
@@ -390,6 +415,16 @@ export default function ProductsPage() {
       {/* 搜索和筛选 */}
       <Card style={{ marginBottom: 16 }}>
         <Space>
+          <Select
+            placeholder="选择店铺"
+            style={{ width: 250 }}
+            value={selectedConfigId}
+            onChange={setSelectedConfigId}
+            options={platformConfigs.map(c => ({
+              value: c.id,
+              label: `${c.shop_name || c.shop_id || '未命名'} (${c.platform_type === 'pinduoduo' ? '拼多多' : c.platform_type})`,
+            }))}
+          />
           <Search
             placeholder="搜索商品标题"
             allowClear

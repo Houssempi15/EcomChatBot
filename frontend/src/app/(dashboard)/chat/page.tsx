@@ -30,12 +30,14 @@ export default function ChatPage() {
   const isLoading = useConversationStore(s => s.isLoading);
   const pagination = useConversationStore(s => s.pagination);
   const statusFilter = useConversationStore(s => s.statusFilter);
+  const platformFilter = useConversationStore(s => s.platformFilter);
   const ragSources = useConversationStore(s => s.ragSources);
   const fetchConversations = useConversationStore(s => s.fetchConversations);
   const selectConversation = useConversationStore(s => s.selectConversation);
   const addMessage = useConversationStore(s => s.addMessage);
   const closeConversation = useConversationStore(s => s.closeConversation);
   const setStatusFilter = useConversationStore(s => s.setStatusFilter);
+  const setPlatformFilter = useConversationStore(s => s.setPlatformFilter);
   const setWsStatus = useConversationStore(s => s.setWsStatus);
   const startStreamingMessage = useConversationStore(s => s.startStreamingMessage);
   const appendStreamChunk = useConversationStore(s => s.appendStreamChunk);
@@ -59,7 +61,7 @@ export default function ChatPage() {
   // Re-fetch when filter changes
   useEffect(() => {
     fetchConversations({ page: 1 });
-  }, [statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [statusFilter, platformFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load conversation detail when selected
   useEffect(() => {
@@ -220,6 +222,8 @@ export default function ChatPage() {
           onSearchChange={setSearchValue}
           statusFilter={statusFilter}
           onStatusFilterChange={handleStatusFilterChange}
+          platformFilter={platformFilter}
+          onPlatformFilterChange={setPlatformFilter}
           pagination={pagination}
           onPageChange={handlePageChange}
           loading={isLoading}

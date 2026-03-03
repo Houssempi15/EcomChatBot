@@ -31,24 +31,25 @@ export const platformApi = {
 
   upsertConfig: async (
     platform: string,
-    data: PlatformConfigUpdate
+    data: PlatformConfigUpdate,
+    configId?: number
   ): Promise<ApiResponse<PlatformConfig>> => {
-    const response = await apiClient.put<ApiResponse<PlatformConfig>>(
-      `/platform/config?platform=${platform}`,
-      data
-    );
+    const url = configId
+      ? `/platform/config?platform=${platform}&config_id=${configId}`
+      : `/platform/config?platform=${platform}`;
+    const response = await apiClient.put<ApiResponse<PlatformConfig>>(url, data);
     return response.data;
   },
 
-  disconnect: async (platform: string): Promise<ApiResponse<{ message: string }>> => {
+  disconnect: async (configId: number): Promise<ApiResponse<{ message: string }>> => {
     const response = await apiClient.delete<ApiResponse<{ message: string }>>(
-      `/platform/config/${platform}`
+      `/platform/config/${configId}`
     );
     return response.data;
   },
 
-  getAuthUrl: (appKey: string, redirectUri: string): string => {
-    return `/api/v1/platform/pinduoduo/auth?app_key=${encodeURIComponent(appKey)}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+  getAuthUrl: (configId: number, redirectUri: string): string => {
+    return `/api/v1/platform/pinduoduo/auth?config_id=${configId}&redirect_uri=${encodeURIComponent(redirectUri)}`;
   },
 
   sendPlatformMessage: async (

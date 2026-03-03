@@ -116,6 +116,7 @@ class ConversationService:
         self,
         user_external_id: str | None = None,
         status: str | None = None,
+        platform_type: str | None = None,
         page: int = 1,
         size: int = 20,
     ) -> tuple[list[Conversation], int]:
@@ -130,6 +131,9 @@ class ConversationService:
 
         if status:
             conditions.append(Conversation.status == status)
+
+        if platform_type:
+            conditions.append(Conversation.platform_type == platform_type)
 
         # 查询总数
         count_stmt = select(func.count(Conversation.id)).where(and_(*conditions))

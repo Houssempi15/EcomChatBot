@@ -82,16 +82,29 @@ async def pinduoduo_webhook(
 @router.get("/pinduoduo/auth", summary="跳转拼多多 OAuth 授权")
 async def pinduoduo_auth(
     tenant_id: TenantTokenDep,
-    app_key: str,
+    db: DBDep,
+    config_id: int,
     redirect_uri: str,
 ):
     """重定向到拼多多 POP OAuth 授权页"""
+    # 查询配置
+    stmt = select(PlatformConfig).where(
+        and_(
+            PlatformConfig.id == config_id,
+            PlatformConfig.tenant_id == tenant_id,
+        )
+    )
+    result = await db.execute(stmt)
+    config = result.scalar_one_or_none()
+    if not config:
+        raise HTTPException(status_code=404, detail="配置不存在")
+
     import urllib.parse
     params = {
         "response_type": "code",
-        "client_id": app_key,
+        "client_id": config.app_key,
         "redirect_uri": redirect_uri,
-        "state": tenant_id,
+        "state": f"{tenant_id}:{config_id}",
     }
     url = f"{PDD_AUTH_URL}?{urllib.parse.urlencode(params)}"
     return RedirectResponse(url=url)
@@ -100,17 +113,24 @@ async def pinduoduo_auth(
 @router.get("/pinduoduo/callback", summary="拼多多 OAuth 回调", include_in_schema=False)
 async def pinduoduo_callback(
     code: str,
-    state: str,  # tenant_id
+    state: str,  # tenant_id:config_id
     db: DBDep,
 ):
     """处理拼多多 OAuth 回调，换取 access_token 并保存，然后重定向到前端"""
     import httpx
     from datetime import datetime, timedelta
 
+    # 解析 state
+    parts = state.split(":")
+    if len(parts) != 2:
+        return RedirectResponse(url="/settings?menu=platform&status=error&msg=invalid_state")
+
+    tenant_id, config_id = parts[0], int(parts[1])
+
     stmt = select(PlatformConfig).where(
         and_(
-            PlatformConfig.tenant_id == state,
-            PlatformConfig.platform_type == "pinduoduo",
+            PlatformConfig.id == config_id,
+            PlatformConfig.tenant_id == tenant_id,
         )
     )
     result = await db.execute(stmt)
@@ -171,25 +191,30 @@ async def upsert_platform_config(
     db: DBDep,
     body: PlatformConfigCreate,
     platform: str = "pinduoduo",
+    config_id: int | None = None,
 ):
     """创建或更新指定平台的配置（upsert），app_secret 加密存储"""
-    stmt = select(PlatformConfig).where(
-        and_(
-            PlatformConfig.tenant_id == tenant_id,
-            PlatformConfig.platform_type == platform,
-        )
-    )
-    result = await db.execute(stmt)
-    config = result.scalar_one_or_none()
-
     encrypted_secret = encrypt_field(body.app_secret)
 
-    if config:
+    if config_id:
+        # 更新现有配置
+        stmt = select(PlatformConfig).where(
+            and_(
+                PlatformConfig.id == config_id,
+                PlatformConfig.tenant_id == tenant_id,
+            )
+        )
+        result = await db.execute(stmt)
+        config = result.scalar_one_or_none()
+        if not config:
+            raise HTTPException(status_code=404, detail="配置不存在")
+
         config.app_key = body.app_key
         config.app_secret = encrypted_secret
         config.auto_reply_threshold = body.auto_reply_threshold
         config.human_takeover_message = body.human_takeover_message
     else:
+        # 创建新配置
         config = PlatformConfig(
             tenant_id=tenant_id,
             platform_type=platform,
@@ -206,17 +231,17 @@ async def upsert_platform_config(
     return config
 
 
-@router.delete("/config/{platform}", summary="断开平台连接")
+@router.delete("/config/{config_id}", summary="断开平台连接")
 async def disconnect_platform(
     tenant_id: TenantTokenDep,
     db: DBDep,
-    platform: str,
+    config_id: int,
 ):
-    """清除指定平台的 access_token，断开连接"""
+    """清除指定配置的 access_token，断开连接"""
     stmt = select(PlatformConfig).where(
         and_(
+            PlatformConfig.id == config_id,
             PlatformConfig.tenant_id == tenant_id,
-            PlatformConfig.platform_type == platform,
         )
     )
     result = await db.execute(stmt)
@@ -231,7 +256,7 @@ async def disconnect_platform(
     config.is_active = False
     await db.commit()
 
-    return {"success": True, "message": f"已断开 {platform} 连接"}
+    return {"success": True, "message": f"已断开 {config.platform_type} 连接"}
 
 
 # ---------------------------------------------------------------------------
