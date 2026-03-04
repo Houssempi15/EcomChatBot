@@ -18,7 +18,6 @@ export interface CreateOrderResponse {
   amount: number;
   currency: string;
   qr_code_url: string;
-  payment_channel: string;
   expires_at: string;
 }
 
@@ -43,7 +42,6 @@ export const subscriptionApi = {
 
   createOrder: async (params: {
     plan_type: string;
-    payment_channel: 'wechat' | 'alipay';
     subscription_type?: string;
   }): Promise<ApiResponse<CreateOrderResponse>> => {
     const response = await apiClient.post<ApiResponse<CreateOrderResponse>>(

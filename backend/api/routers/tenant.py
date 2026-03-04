@@ -183,7 +183,7 @@ async def subscribe_plan(
 
     - **plan_type**: 套餐类型 (basic/professional/enterprise)
     - **duration_months**: 订阅时长（月），1-36个月
-    - **payment_method**: 支付方式 (alipay/wechat)
+    - **payment_method**: 支付方式 (alipay)
     - **auto_renew**: 是否自动续费
 
     流程：
@@ -222,13 +222,11 @@ async def subscribe_plan(
             )
         )
 
-    # 付费套餐：创建支付订单
+    # 付费套餐：创建支付宝支付订单
     payment_service = PaymentService(db)
-    channel = "wechat" if request.payment_method == "wechat" else "alipay"
     order, qr_url = await payment_service.create_native_payment_order(
         tenant_id=tenant.id,
         plan_type=request.plan_type,
-        payment_channel=channel,
         subscription_type=SubscriptionType.NEW,
         description=f"{request.plan_type}套餐订阅",
     )
@@ -307,7 +305,6 @@ async def change_plan(
             order, qr_url = await payment_service.create_native_payment_order(
                 tenant_id=tenant.id,
                 plan_type=request.new_plan_type,
-                payment_channel="wechat",
                 subscription_type=SubscriptionType.UPGRADE,
                 description=f"套餐升级: {current_plan} -> {request.new_plan_type}",
             )

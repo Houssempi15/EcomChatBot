@@ -182,13 +182,12 @@ async def sync_pending_orders() -> Dict[str, Any]:
 
             for order in pending_orders:
                 try:
-                    # 通过统一网关查询订单状态
-                    channel = "wechat" if order.payment_channel == PaymentChannel.WECHAT else "alipay"
+                    # 通过支付宝网关查询订单状态
                     gw_result = None
                     if payment_service._gateway:
                         try:
                             gw_result = await payment_service._gateway.query_order(
-                                order.order_number, channel
+                                order.order_number
                             )
                         except Exception as qe:
                             logger.warning(f"网关查询失败 ({order.order_number}): {qe}")
@@ -375,42 +374,28 @@ async def process_single_renewal(db: AsyncSession, subscription: Subscription) -
     # 4. 尝试自动扣款
     payment_service = PaymentService(db)
 
-    # 检查租户是否设置了默认支付方式
-    # TODO: 需要在Tenant模型中添加 default_payment_channel 字段
-    # 这里暂时使用支付宝
-    payment_channel = "alipay"  # 或从 tenant.default_payment_channel 获取
-
     try:
-        # 创建续费订单
-        from models.payment import PaymentType, SubscriptionType
+        # 创建续费订单（支付宝扫码支付，需要用户主动扫码）
+        from models.payment import SubscriptionType
 
-        if payment_channel == "wechat":
-            # 微信支付续费(需要用户主动扫码,不能自动扣款)
-            # 发送续费提醒,引导用户支付
-            await send_renewal_reminder_notification(tenant_id, "wechat_renewal_required")
-            return {"success": False, "skipped": True, "reason": "微信支付需要用户主动扫码"}
-        else:
-            # 支付宝支付
-            order, payment_html = await payment_service.create_payment_order(
-                tenant_id=tenant.id,
-                plan_type=subscription.plan_type,
-                duration_months=duration_months,
-                payment_type=PaymentType.PC,
-                subscription_type=SubscriptionType.RENEWAL,
-                description=f"{subscription.plan_type}套餐自动续费"
-            )
+        order, qr_url = await payment_service.create_native_payment_order(
+            tenant_id=tenant.id,
+            plan_type=subscription.plan_type,
+            subscription_type=SubscriptionType.RENEWAL,
+            description=f"{subscription.plan_type}套餐自动续费",
+        )
 
-            # 发送续费订单通知,引导用户完成支付
-            await send_renewal_order_notification(tenant_id, order.order_number, float(total_amount))
+        # 发送续费订单通知,引导用户完成支付
+        await send_renewal_order_notification(tenant_id, order.order_number, float(total_amount))
 
-            logger.info(f"创建续费订单成功: tenant={tenant_id}, order={order.order_number}")
+        logger.info(f"创建续费订单成功: tenant={tenant_id}, order={order.order_number}")
 
-            return {
-                "success": True,
-                "order_number": order.order_number,
-                "amount": float(total_amount),
-                "message": "已创建续费订单,等待支付"
-            }
+        return {
+            "success": True,
+            "order_number": order.order_number,
+            "amount": float(total_amount),
+            "message": "已创建续费订单,等待支付"
+        }
 
     except Exception as e:
         logger.error(f"创建续费订单失败: {e}")
@@ -620,31 +605,15 @@ async def process_refund(self, order_id: str, refund_amount: float, reason: str)
                     "error": f"退款金额不能超过订单金额",
                 }
 
-            # 4. 根据支付渠道调用退款接口
+            # 4. 调用支付宝退款接口
             payment_service = PaymentService(db)
-            refund_result = None
 
             try:
-                if order.payment_channel == PaymentChannel.ALIPAY:
-                    # 支付宝退款
-                    refund_result = await payment_service.refund_order(
-                        order_number=order.order_number,
-                        refund_amount=refund_decimal,
-                        refund_reason=reason
-                    )
-                elif order.payment_channel == PaymentChannel.WECHAT:
-                    # 微信退款
-                    refund_result = await payment_service.refund_wechat_order(
-                        order_number=order.order_number,
-                        refund_amount=refund_decimal,
-                        refund_reason=reason
-                    )
-                else:
-                    return {
-                        "success": False,
-                        "error": f"不支持的支付渠道: {order.payment_channel}",
-                    }
-
+                refund_result = await payment_service.refund_order(
+                    order_number=order.order_number,
+                    refund_amount=refund_decimal,
+                    refund_reason=reason
+                )
             except Exception as e:
                 logger.error(f"调用退款接口失败: {e}")
                 raise

@@ -44,13 +44,6 @@ class PaymentService:
     """支付服务类"""
 
     def __init__(self, db: AsyncSession, gateway: Optional[PaymentGateway] = None):
-        """
-        初始化支付服务
-
-        Args:
-            db: 数据库会话
-            gateway: 支付网关实现（可选，默认从配置自动创建 YunGouOS 客户端）
-        """
         self.db = db
         if gateway is not None:
             self._gateway = gateway
@@ -59,9 +52,9 @@ class PaymentService:
 
     @staticmethod
     def _init_default_gateway() -> Optional[PaymentGateway]:
-        """从配置初始化默认网关（YunGouOS）"""
-        from services.yungouos_client import get_yungouos_client
-        return get_yungouos_client()
+        """从配置初始化默认网关（支付宝官方 SDK）"""
+        from services.alipay_client import get_alipay_client
+        return get_alipay_client()
 
     @staticmethod
     def generate_order_number() -> str:
@@ -88,17 +81,15 @@ class PaymentService:
         self,
         tenant_id: int,
         plan_type: str,
-        payment_channel: str,
         subscription_type: SubscriptionType,
         description: Optional[str] = None,
     ) -> tuple[PaymentOrder, str]:
         """
-        创建扫码支付订单
+        创建支付宝扫码支付订单
 
         Args:
             tenant_id: 租户ID
             plan_type: 套餐类型（monthly/quarterly/semi_annual/annual）
-            payment_channel: 支付渠道（wechat/alipay）
             subscription_type: 订阅类型
             description: 订单描述
 
@@ -106,7 +97,7 @@ class PaymentService:
             (订单对象, 二维码URL)
         """
         if not self._gateway:
-            raise PaymentException("支付网关未配置，请检查 YunGouOS 配置")
+            raise PaymentException("支付网关未配置，请检查支付宝配置")
 
         try:
             # 验证租户
@@ -118,55 +109,54 @@ class PaymentService:
 
             amount = self.get_plan_amount(plan_type)
             order_number = self.generate_order_number()
+            subject = description or f"电商智能客服-{plan_type}套餐"
 
             order = PaymentOrder(
                 order_number=order_number,
                 tenant_id=tenant_id,
                 amount=amount,
                 currency="CNY",
-                payment_channel=PaymentChannel.WECHAT if payment_channel == "wechat" else PaymentChannel.ALIPAY,
+                payment_channel=PaymentChannel.ALIPAY,
                 payment_type=PaymentType.NATIVE,
                 status=OrderStatus.PENDING,
                 subscription_type=subscription_type,
                 plan_type=plan_type,
-                duration_months=0,  # 按天计算，不再使用月数
+                duration_months=0,
                 expired_at=datetime.now() + timedelta(hours=2),
-                description=description or f"电商智能客服-{plan_type}套餐",
+                description=subject,
             )
 
             self.db.add(order)
             await self.db.commit()
             await self.db.refresh(order)
 
-            # 调用支付网关
-            notify_url = getattr(settings, "yungouos_notify_url", "")
+            # 调用支付宝网关
+            notify_url = getattr(settings, "alipay_notify_url", "")
             result = await self._gateway.create_native_pay(
                 out_trade_no=order_number,
-                total_fee=str(amount),
-                body=f"电商智能客服-{plan_type}套餐",
+                total_amount=str(amount),
+                subject=subject,
                 notify_url=notify_url,
-                channel=payment_channel,
-                attach=str(tenant_id),
             )
 
-            qr_url = result.get("qr_url", "")
-            order.qr_code_url = qr_url
-            order.payment_url = qr_url
+            qr_code = result.get("qr_code", "")
+            order.qr_code_url = qr_code
+            order.payment_url = qr_code
             await self.db.commit()
 
-            logger.info(f"Created native payment order: {order_number}, tenant={tenant_id}, channel={payment_channel}")
-            return order, qr_url
+            logger.info(f"Created alipay payment order: {order_number}, tenant={tenant_id}")
+            return order, qr_code
 
         except (TenantNotFoundException, PaymentException):
             raise
         except Exception as e:
             await self.db.rollback()
-            logger.error(f"Error creating native payment order: {e}")
+            logger.error(f"Error creating payment order: {e}")
             raise PaymentException(f"创建支付订单失败: {str(e)}")
 
-    async def handle_yungouos_notify(self, notify_data: Dict[str, str]) -> bool:
+    async def handle_alipay_notify(self, notify_data: Dict[str, str]) -> bool:
         """
-        处理 YunGouOS 统一回调（微信+支付宝共用）
+        处理支付宝异步回调
 
         Args:
             notify_data: 回调参数字典
@@ -180,14 +170,23 @@ class PaymentService:
                 return False
 
             if not self._gateway.verify_notify(notify_data):
-                logger.error("YunGouOS notify signature verification failed")
+                logger.error("Alipay notify signature verification failed")
                 return False
 
             out_trade_no = notify_data.get("out_trade_no")
-            pay_no = notify_data.get("pay_no", "")
-            money = notify_data.get("money", "0")
+            trade_no = notify_data.get("trade_no", "")
+            trade_status = notify_data.get("trade_status", "")
+            total_amount = notify_data.get("total_amount", "0")
 
-            logger.info(f"Processing YunGouOS notify: out_trade_no={out_trade_no}, pay_no={pay_no}")
+            logger.info(
+                f"Processing alipay notify: out_trade_no={out_trade_no}, "
+                f"trade_no={trade_no}, status={trade_status}"
+            )
+
+            # 只处理支付成功的通知
+            if trade_status not in ("TRADE_SUCCESS", "TRADE_FINISHED"):
+                logger.info(f"Ignoring non-success trade status: {trade_status}")
+                return True
 
             stmt = select(PaymentOrder).where(PaymentOrder.order_number == out_trade_no)
             result = await self.db.execute(stmt)
@@ -201,19 +200,18 @@ class PaymentService:
                 logger.info(f"Order already paid: {out_trade_no}")
                 return True
 
-            # 验证金额（允许 0.01 误差）
-            notify_amount = Decimal(money)
+            # 验证金额
+            notify_amount = Decimal(total_amount)
             if abs(order.amount - notify_amount) > Decimal("0.01"):
                 logger.error(f"Amount mismatch: order={order.amount}, notify={notify_amount}")
                 return False
 
             order.status = OrderStatus.PAID
-            order.trade_no = pay_no
+            order.trade_no = trade_no
             order.paid_at = datetime.now()
             order.callback_data = json.dumps(notify_data, ensure_ascii=False)
             order.callback_count += 1
 
-            channel = PaymentChannel.WECHAT if order.payment_channel == PaymentChannel.WECHAT else PaymentChannel.ALIPAY
             transaction = PaymentTransaction(
                 order_id=order.id,
                 transaction_no=f"TXN{datetime.now().strftime('%Y%m%d%H%M%S')}{secrets.token_hex(4).upper()}",
@@ -221,8 +219,8 @@ class PaymentService:
                 transaction_status=TransactionStatus.SUCCESS,
                 amount=notify_amount,
                 currency="CNY",
-                third_party_trade_no=pay_no,
-                payment_channel=channel,
+                third_party_trade_no=trade_no,
+                payment_channel=PaymentChannel.ALIPAY,
                 transaction_data=json.dumps(notify_data, ensure_ascii=False),
                 transaction_time=datetime.now(),
             )
@@ -231,12 +229,12 @@ class PaymentService:
             await self._activate_subscription(order)
             await self.db.commit()
 
-            logger.info(f"YunGouOS payment success: {out_trade_no}")
+            logger.info(f"Alipay payment success: {out_trade_no}")
             return True
 
         except Exception as e:
             await self.db.rollback()
-            logger.error(f"Error handling YunGouOS notify: {e}")
+            logger.error(f"Error handling alipay notify: {e}")
             return False
 
     async def _activate_subscription(self, order: PaymentOrder) -> None:
@@ -314,9 +312,8 @@ class PaymentService:
                 return None
 
             if order.status == OrderStatus.PENDING and self._gateway:
-                channel = "wechat" if order.payment_channel == PaymentChannel.WECHAT else "alipay"
                 try:
-                    gw_result = await self._gateway.query_order(order_number, channel)
+                    gw_result = await self._gateway.query_order(order_number)
                     if gw_result.get("paid"):
                         order.status = OrderStatus.PAID
                         order.trade_no = gw_result.get("trade_no")
@@ -364,15 +361,14 @@ class PaymentService:
             if refund_amount > order.amount:
                 raise PaymentException("退款金额不能大于订单金额")
 
-            channel = "wechat" if order.payment_channel == PaymentChannel.WECHAT else "alipay"
-
             if self._gateway:
-                await self._gateway.refund(
+                refund_result = await self._gateway.refund(
                     out_trade_no=order_number,
                     refund_amount=str(refund_amount),
                     refund_reason=refund_reason,
-                    channel=channel,
                 )
+                if not refund_result.get("success"):
+                    raise PaymentException(f"退款失败: {refund_result.get('message', '未知错误')}")
 
             order.status = OrderStatus.REFUNDED if refund_amount >= order.amount else OrderStatus.REFUNDING
 

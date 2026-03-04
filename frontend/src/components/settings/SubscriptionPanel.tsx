@@ -14,8 +14,6 @@ const PLAN_PRICES = [
   { key: 'annual',      name: '年付版',  price: 1699, days: 365 },
 ];
 
-type PayChannel = 'wechat' | 'alipay';
-
 function statusTag(status: SubscriptionStatus['status']) {
   if (status === 'active') return <Tag color="green">有效</Tag>;
   if (status === 'grace')  return <Tag color="orange">宽限期</Tag>;
@@ -28,7 +26,6 @@ export default function SubscriptionPanel() {
 
   // 购买流程状态
   const [selectedPlan, setSelectedPlan] = useState<string>('monthly');
-  const [channel, setChannel] = useState<PayChannel>('wechat');
   const [ordering, setOrdering] = useState(false);
   const [order, setOrder] = useState<CreateOrderResponse | null>(null);
   const [qrModalOpen, setQrModalOpen] = useState(false);
@@ -80,7 +77,6 @@ export default function SubscriptionPanel() {
     try {
       const res = await subscriptionApi.createOrder({
         plan_type: selectedPlan,
-        payment_channel: channel,
         subscription_type: 'new',
       });
       if (res.success && res.data) {
@@ -157,17 +153,6 @@ export default function SubscriptionPanel() {
           </div>
         </Radio.Group>
 
-        {/* 支付方式 */}
-        <Title level={5} className="mb-3">支付方式</Title>
-        <Radio.Group
-          value={channel}
-          onChange={e => setChannel(e.target.value)}
-          className="mb-4"
-        >
-          <Radio value="wechat">微信扫码</Radio>
-          <Radio value="alipay">支付宝扫码</Radio>
-        </Radio.Group>
-
         {/* 支付按钮 */}
         <Button
           type="primary"
@@ -177,13 +162,13 @@ export default function SubscriptionPanel() {
           onClick={handlePay}
           disabled={!selectedPlan}
         >
-          立即支付 ¥{selectedPlanInfo?.price ?? '--'}
+          支付宝扫码支付 ¥{selectedPlanInfo?.price ?? '--'}
         </Button>
       </Spin>
 
       {/* 二维码弹窗 */}
       <Modal
-        title={`扫码支付 - ${selectedPlanInfo?.name}`}
+        title={`支付宝扫码支付 - ${selectedPlanInfo?.name}`}
         open={qrModalOpen}
         onCancel={handleCloseModal}
         footer={null}
@@ -210,14 +195,14 @@ export default function SubscriptionPanel() {
               <>
                 <Image
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(order.qr_code_url)}`}
-                  alt="支付二维码"
+                  alt="支付宝支付二维码"
                   className="mx-auto mb-3"
                   width={200}
                   height={200}
                   unoptimized
                 />
                 <div className="text-gray-500 text-sm mb-2">
-                  请使用{channel === 'wechat' ? '微信' : '支付宝'}扫码支付
+                  请使用支付宝扫码支付
                 </div>
                 <Text strong className="text-lg text-red-500">
                   ¥{order.amount}

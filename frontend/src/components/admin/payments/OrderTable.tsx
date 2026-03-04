@@ -26,9 +26,6 @@ const statusConfig: Record<PaymentOrderStatus, { color: string; label: string }>
 
 const paymentMethodLabels: Record<string, string> = {
   alipay: '支付宝',
-  wechat: '微信支付',
-  bank_transfer: '银行转账',
-  credit_card: '信用卡',
 };
 
 export default function OrderTable({

@@ -15,7 +15,7 @@ class SubscribePlanRequest(BaseModel):
     """订阅套餐请求"""
     plan_type: str = Field(..., description="套餐类型: basic/professional/enterprise")
     duration_months: int = Field(..., ge=1, le=36, description="订阅时长（月）: 1-36")
-    payment_method: str = Field(default="alipay", description="支付方式: alipay/wechat")
+    payment_method: str = Field(default="alipay", description="支付方式: alipay")
     auto_renew: bool = Field(default=False, description="是否自动续费")
 
 

@@ -153,10 +153,8 @@ RATE_LIMIT_PER_MINUTE=60
 ENABLE_METRICS=true
 ENABLE_TRACING=false
 
-# ============ 支付回调 URL ============
-ALIPAY_RETURN_URL=https://www.ecomchat.cn/payment/alipay/return
+# ============ 支付宝回调 URL ============
 ALIPAY_NOTIFY_URL=https://www.ecomchat.cn/api/v1/payment/callback/alipay/notify
-YUNGOUOS_NOTIFY_URL=https://www.ecomchat.cn/api/v1/payment/callback/yungouos/notify
 EOF
 
     chmod 600 "$ENV_FILE"

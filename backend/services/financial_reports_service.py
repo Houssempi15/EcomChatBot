@@ -171,7 +171,6 @@ class FinancialReportsService:
 
         channel_names = {
             PaymentChannel.ALIPAY: "支付宝",
-            PaymentChannel.WECHAT: "微信支付",
         }
 
         return [

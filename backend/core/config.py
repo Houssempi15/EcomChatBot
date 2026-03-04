@@ -128,22 +128,14 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_format: str = "json"
 
-    # ============ 支付宝配置（旧，保留兼容） ============
-    alipay_appid: str = ""
-    alipay_private_key_path: str = "/app/keys/alipay_private_key.pem"
-    alipay_public_key_path: str = "/app/keys/alipay_platform_public_key.pem"
-    alipay_gateway_url: str = "https://openapi.alipay.com/gateway.do"
-    alipay_return_url: str = ""
+    # ============ 支付宝官方 SDK 配置 ============
+    alipay_app_id: str = ""
+    alipay_private_key: str = ""  # PEM 格式私钥字符串
+    alipay_public_key: str = ""   # 支付宝平台公钥字符串
+    alipay_gateway: str = "https://openapi.alipay.com/gateway.do"
     alipay_notify_url: str = ""
-    alipay_sandbox: bool = True
+    alipay_sandbox: bool = False
     alipay_sandbox_gateway: str = "https://openapi-sandbox.dl.alipaydev.com/gateway.do"
-
-    # ============ YunGouOS 聚合支付配置 ============
-    yungouos_wechat_mch_id: str = ""
-    yungouos_wechat_key: str = ""
-    yungouos_alipay_mch_id: str = ""
-    yungouos_alipay_key: str = ""
-    yungouos_notify_url: str = ""
 
     # ============ 拼多多开放平台配置 ============
     pdd_app_key: str = ""

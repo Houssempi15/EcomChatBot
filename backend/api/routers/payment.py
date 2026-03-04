@@ -1,7 +1,7 @@
 """
 支付 API 路由
 
-提供支付相关的HTTP接口（YunGouOS 聚合支付版本）
+提供支付相关的HTTP接口（支付宝官方 API 版本）
 """
 import logging
 from typing import Optional
@@ -26,7 +26,6 @@ router = APIRouter(prefix="/payment", tags=["支付管理"])
 
 class CreateOrderRequest(BaseModel):
     plan_type: str
-    payment_channel: str = "wechat"  # "wechat" | "alipay"
     subscription_type: str = "new"   # "new" | "renewal" | "upgrade"
     description: Optional[str] = None
 
@@ -38,18 +37,17 @@ class RefundRequest(BaseModel):
 
 # ===== 订单接口 =====
 
-@router.post("/orders/create", summary="创建扫码支付订单")
+@router.post("/orders/create", summary="创建支付宝扫码支付订单")
 async def create_payment_order(
     request_data: CreateOrderRequest,
     tenant_id: TenantDep,
     db: DBDep,
 ):
     """
-    创建 YunGouOS 扫码支付订单
+    创建支付宝扫码支付订单
 
     **请求参数**:
     - plan_type: 套餐类型（monthly/quarterly/semi_annual/annual）
-    - payment_channel: 支付渠道（wechat/alipay）
     - subscription_type: 订阅类型（new/renewal/upgrade）
 
     **响应**:
@@ -60,9 +58,6 @@ async def create_payment_order(
     """
     if request_data.plan_type not in PLAN_CONFIG:
         raise HTTPException(status_code=400, detail=f"无效的套餐类型: {request_data.plan_type}")
-
-    if request_data.payment_channel not in ("wechat", "alipay"):
-        raise HTTPException(status_code=400, detail="payment_channel 必须为 wechat 或 alipay")
 
     try:
         sub_type_map = {
@@ -76,7 +71,6 @@ async def create_payment_order(
         order, qr_url = await payment_service.create_native_payment_order(
             tenant_id=tenant_id,
             plan_type=request_data.plan_type,
-            payment_channel=request_data.payment_channel,
             subscription_type=subscription_type,
             description=request_data.description,
         )
@@ -87,7 +81,6 @@ async def create_payment_order(
             "amount": float(order.amount),
             "currency": order.currency,
             "qr_code_url": qr_url,
-            "payment_channel": request_data.payment_channel,
             "expires_at": order.expired_at.isoformat(),
         })
 
@@ -127,7 +120,7 @@ async def sync_order_status(
     tenant_id: TenantDep,
     db: DBDep,
 ):
-    """主动向 YunGouOS 查询最新状态并更新本地订单"""
+    """主动向支付宝查询最新状态并更新本地订单"""
     try:
         payment_service = PaymentService(db)
         order_info = await payment_service.query_order_status(order_number)
@@ -168,38 +161,40 @@ async def refund_order(
         raise HTTPException(status_code=500, detail=f"退款失败: {str(e)}")
 
 
-# ===== YunGouOS 统一回调 =====
+# ===== 支付宝异步回调 =====
 
-@router.post("/callback/yungouos/notify", summary="YunGouOS 统一回调（微信+支付宝）")
-async def yungouos_notify_callback(
+@router.post("/callback/alipay/notify", summary="支付宝异步回调")
+async def alipay_notify_callback(
     request: Request,
     db: DBDep,
 ):
     """
-    YunGouOS 统一回调接口（微信和支付宝共用）
+    支付宝异步回调处理
 
-    - 验证签名
-    - 更新订单状态
-    - 激活订阅
-    - 返回 SUCCESS 字符串表示处理成功
+    支付宝会POST以下参数：
+    - out_trade_no: 商户订单号
+    - trade_no: 支付宝交易号
+    - trade_status: 交易状态
+    - total_amount: 订单金额
+    - sign: 签名
     """
     try:
         form_data = await request.form()
         notify_data = dict(form_data)
 
-        logger.info(f"Received YunGouOS notify: out_trade_no={notify_data.get('out_trade_no')}")
+        logger.info(f"Received alipay notify: {notify_data.get('out_trade_no')}")
 
         payment_service = PaymentService(db)
-        success = await payment_service.handle_yungouos_notify(notify_data)
+        success = await payment_service.handle_alipay_notify(notify_data)
 
         if success:
-            return Response(content="SUCCESS", media_type="text/plain")
+            return Response(content="success", media_type="text/plain")
         else:
-            return Response(content="FAIL", media_type="text/plain")
+            return Response(content="fail", media_type="text/plain", status_code=400)
 
     except Exception as e:
-        logger.error(f"Error in YunGouOS notify callback: {e}")
-        return Response(content="FAIL", media_type="text/plain")
+        logger.error(f"Error handling alipay notify: {e}")
+        return Response(content="fail", media_type="text/plain", status_code=500)
 
 
 # ===== 订单列表（管理员） =====
@@ -271,7 +266,7 @@ async def list_payment_orders(
     })
 
 
-# ===== 订阅管理接口（保留兼容） =====
+# ===== 订阅管理接口 =====
 
 @router.get("/subscription", summary="获取订阅详情")
 async def get_subscription(
@@ -327,7 +322,6 @@ async def subscribe_plan(
         order, qr_url = await payment_service.create_native_payment_order(
             tenant_id=tenant_id,
             plan_type=request_data.plan_type,
-            payment_channel=request_data.payment_channel or "wechat",
             subscription_type=SubscriptionType.NEW,
             description=f"订阅{request_data.plan_type}套餐",
         )
@@ -353,7 +347,6 @@ async def change_plan(
     new_plan_type: str,
     tenant_id: TenantDep,
     db: DBDep,
-    payment_channel: str = "wechat",
 ):
     """变更套餐（升级需支付差价，降级下周期生效）"""
     try:
@@ -373,7 +366,6 @@ async def change_plan(
             order, qr_url = await payment_service.create_native_payment_order(
                 tenant_id=tenant_id,
                 plan_type=new_plan_type,
-                payment_channel=payment_channel,
                 subscription_type=SubscriptionType.UPGRADE,
                 description=f"升级到{new_plan_type}套餐",
             )

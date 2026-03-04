@@ -13,36 +13,31 @@ class PaymentGateway(ABC):
     async def create_native_pay(
         self,
         out_trade_no: str,
-        total_fee: str,
-        body: str,
+        total_amount: str,
+        subject: str,
         notify_url: str,
-        channel: str,
-        attach: str = "",
     ) -> dict:
         """
         创建扫码支付订单
 
         Args:
             out_trade_no: 商户订单号
-            total_fee: 订单金额（元，字符串）
-            body: 商品描述
+            total_amount: 订单金额（元，字符串）
+            subject: 商品描述
             notify_url: 回调通知地址
-            channel: 支付渠道 "wechat" | "alipay"
-            attach: 附加数据（可选）
 
         Returns:
-            {"qr_url": str, "qr_base64": str | None}
+            {"qr_code": str}
         """
         ...
 
     @abstractmethod
-    async def query_order(self, out_trade_no: str, channel: str) -> dict:
+    async def query_order(self, out_trade_no: str) -> dict:
         """
         查询订单状态
 
         Args:
             out_trade_no: 商户订单号
-            channel: 支付渠道 "wechat" | "alipay"
 
         Returns:
             {"paid": bool, "trade_no": str, "amount": str}
@@ -68,7 +63,6 @@ class PaymentGateway(ABC):
         out_trade_no: str,
         refund_amount: str,
         refund_reason: str,
-        channel: str,
     ) -> dict:
         """
         申请退款
@@ -77,9 +71,8 @@ class PaymentGateway(ABC):
             out_trade_no: 商户订单号
             refund_amount: 退款金额（元，字符串）
             refund_reason: 退款原因
-            channel: 支付渠道 "wechat" | "alipay"
 
         Returns:
-            {"success": bool, "refund_no": str}
+            {"success": bool, "refund_no": str, "message": str}
         """
         ...
