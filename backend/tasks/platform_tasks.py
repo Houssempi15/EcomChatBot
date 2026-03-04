@@ -21,6 +21,7 @@ async def _refresh_expiring_tokens():
     from db import get_db
     from models.platform import PlatformConfig
     from services.platform.pinduoduo_client import PinduoduoClient
+    from services.platform.douyin_client import DouyinClient
 
     threshold = datetime.utcnow() + timedelta(days=1)
 
@@ -42,7 +43,14 @@ async def _refresh_expiring_tokens():
                     plain_secret = decrypt_field(config.app_secret)
                 except Exception:
                     plain_secret = config.app_secret
-                client = PinduoduoClient(config.app_key, plain_secret)
+
+                if config.platform_type == "pinduoduo":
+                    client = PinduoduoClient(config.app_key, plain_secret)
+                elif config.platform_type == "douyin":
+                    client = DouyinClient(config.app_key, plain_secret)
+                else:
+                    continue
+
                 token_data = await client.refresh_access_token(config.refresh_token)
                 new_token = token_data.get("access_token")
                 new_refresh = token_data.get("refresh_token")

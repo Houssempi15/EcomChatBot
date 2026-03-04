@@ -3,16 +3,15 @@
 """
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy import and_, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import DBDep, TenantTokenDep
 from core.crypto import decrypt_field, encrypt_field
 from models.platform import PlatformConfig
-from schemas.platform import PlatformConfigCreate, PlatformConfigResponse, PinduoduoWebhookPayload
+from schemas.platform import PlatformConfigCreate, PlatformConfigResponse
 from services.platform.pinduoduo_client import PinduoduoClient
 from services.platform.douyin_client import DouyinClient
 from services.platform.platform_message_service import PlatformMessageService
@@ -22,9 +21,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/platform", tags=["平台对接"])
 
 PDD_AUTH_URL = "https://mms.pinduoduo.com/open.html"
-PDD_TOKEN_URL = "https://open-api.pinduoduo.com/oauth/token"
 DOUYIN_AUTH_URL = "https://open.douyin.com/platform/oauth/connect"
-DOUYIN_TOKEN_URL = "https://open.douyin.com/oauth/access_token"
 
 
 # ---------------------------------------------------------------------------
@@ -83,9 +80,11 @@ async def douyin_webhook(
     request: Request,
     background_tasks: BackgroundTasks,
     db: DBDep,
-    x_douyin_signature: str | None = Header(None, alias="X-Douyin-Signature"),
+    event_sign: str | None = Header(None, alias="event-sign"),
+    app_id: str | None = Header(None, alias="app-id"),
+    sign_method: str | None = Header(None, alias="sign-method"),
 ):
-    """接收抖音 Webhook 推送，验签后异步处理"""
+    """接收抖店消息推送，验签后异步处理"""
     body = await request.body()
 
     try:
@@ -93,13 +92,15 @@ async def douyin_webhook(
     except Exception:
         raise HTTPException(status_code=400, detail="无效的请求体")
 
-    # 验签：解析 shop_id → 查 config → 解密 secret → 验签
-    shop_id = str(payload_data.get("shop_id", ""))
-    if x_douyin_signature and shop_id:
+    # 抖店验签：event-sign + app-id（app_key）
+    if event_sign:
+        if not app_id:
+            raise HTTPException(status_code=401, detail="缺少 app-id 头")
+
         stmt = select(PlatformConfig).where(
             and_(
                 PlatformConfig.platform_type == "douyin",
-                PlatformConfig.shop_id == shop_id,
+                PlatformConfig.app_key == app_id,
                 PlatformConfig.is_active == True,
             )
         )
@@ -112,16 +113,21 @@ async def douyin_webhook(
             except Exception:
                 plain_secret = config.app_secret
             client = DouyinClient(config.app_key, plain_secret)
-            if not client.verify_webhook_signature(body, x_douyin_signature):
+            if not client.verify_webhook_signature(
+                body=body,
+                signature=event_sign,
+                app_id=app_id,
+                sign_method=sign_method,
+            ):
                 raise HTTPException(status_code=401, detail="Webhook 签名验证失败")
         else:
-            if x_douyin_signature:
-                raise HTTPException(status_code=401, detail="未找到对应的平台配置")
+            raise HTTPException(status_code=401, detail="未找到对应的平台配置")
 
     service = PlatformMessageService(db)
     background_tasks.add_task(service.handle_douyin_webhook, payload_data)
 
-    return {"success": True}
+    # 官方要求 2s 内返回 code=0,msg=success
+    return {"code": 0, "msg": "success"}
 
 
 # ---------------------------------------------------------------------------
@@ -256,7 +262,6 @@ async def douyin_callback(
     db: DBDep,
 ):
     """处理抖音 OAuth 回调，换取 access_token 并保存"""
-    import httpx
     from datetime import datetime, timedelta
 
     parts = state.split(":")
@@ -284,12 +289,9 @@ async def douyin_callback(
 
     client = DouyinClient(config.app_key, plain_secret)
     try:
-        token_data = await client.call_api(
-            endpoint="/oauth/access_token",
-            params={
-                "code": code,
-                "grant_type": "authorization_code",
-            },
+        token_data = await client.create_access_token(
+            code=code,
+            grant_type="authorization_code",
         )
     except Exception as e:
         logger.error("换取 access_token 失败: %s", e)
@@ -297,13 +299,21 @@ async def douyin_callback(
 
     access_token = token_data.get("access_token")
     refresh_token = token_data.get("refresh_token")
-    expires_in = token_data.get("expires_in", 86400)
-    open_id = str(token_data.get("open_id", ""))
+    expires_in = token_data.get("expires_in", 7 * 24 * 3600)
+    shop_id = str(
+        token_data.get("shop_id")
+        or token_data.get("auth_id")
+        or token_data.get("open_id")
+        or ""
+    )
+    shop_name = token_data.get("shop_name")
 
     config.access_token = access_token
     config.refresh_token = refresh_token
     config.expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
-    config.shop_id = open_id
+    config.shop_id = shop_id
+    if shop_name:
+        config.shop_name = shop_name
     config.is_active = True
     await db.commit()
 

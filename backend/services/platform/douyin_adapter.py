@@ -1,6 +1,7 @@
 """抖音抖店平台适配器"""
 import logging
 from datetime import datetime
+from typing import Any
 
 from services.platform.base_adapter import (
     BasePlatformAdapter, OrderDTO, PageResult, ProductDTO,
@@ -19,30 +20,46 @@ class DouyinAdapter(BasePlatformAdapter):
 
     def _parse_product(self, raw: dict) -> ProductDTO:
         """将抖音商品原始数据转为 ProductDTO"""
-        images = raw.get("pic", [])
+        images = raw.get("pic") or raw.get("imgs") or raw.get("images") or []
         if isinstance(images, str):
             images = [images]
+        videos = raw.get("video") or raw.get("videos") or []
+        if isinstance(videos, str):
+            videos = [videos]
+
+        def _to_price(v: Any) -> float:
+            if v is None:
+                return 0.0
+            # 抖店金额字段多数为分，兼容小数金额字段
+            fv = float(v)
+            return fv / 100 if fv >= 100 else fv
 
         return ProductDTO(
-            platform_product_id=str(raw.get("product_id", "")),
-            title=raw.get("name", ""),
-            price=float(raw.get("price", 0)) / 100,  # 抖音价格单位为分
-            original_price=float(raw.get("market_price", 0)) / 100 if raw.get("market_price") else None,
+            platform_product_id=str(
+                raw.get("product_id")
+                or raw.get("id")
+                or raw.get("out_product_id")
+                or ""
+            ),
+            title=raw.get("name") or raw.get("title") or "",
+            price=_to_price(raw.get("price")),
+            original_price=_to_price(raw.get("market_price")) if raw.get("market_price") else None,
             description=raw.get("description", ""),
             category=raw.get("category_name", ""),
             images=images,
-            videos=raw.get("video", []),
-            attributes=raw.get("spec_list"),
-            sales_count=raw.get("sales", 0),
-            stock=raw.get("stock_num", 0),
-            status="active" if raw.get("status") == 1 else "inactive",
+            videos=videos,
+            attributes=raw.get("spec_list") or raw.get("specs"),
+            sales_count=int(raw.get("sales") or raw.get("sale_num") or 0),
+            stock=int(raw.get("stock_num") or raw.get("stock") or 0),
+            status="active" if int(raw.get("status", 1) or 1) in (1, 105) else "inactive",
             platform_data=raw,
         )
 
     async def fetch_products(self, page: int = 1, page_size: int = 50) -> PageResult:
         """拉取抖音商品列表"""
         result = await self.client.call_api(
-            endpoint="/product/list",
+            endpoint="/product/listV2",
+            api_method="product.listV2",
             params={
                 "page": page,
                 "size": page_size,
@@ -50,7 +67,12 @@ class DouyinAdapter(BasePlatformAdapter):
             access_token=self.access_token,
         )
 
-        product_list = result.get("list", [])
+        product_list = (
+            result.get("list")
+            or result.get("product_list")
+            or result.get("products")
+            or []
+        )
         total = result.get("total", 0)
 
         products = [self._parse_product(p) for p in product_list]
@@ -66,17 +88,19 @@ class DouyinAdapter(BasePlatformAdapter):
         """获取抖音商品详情"""
         result = await self.client.call_api(
             endpoint="/product/detail",
+            api_method="product.detail",
             params={"product_id": product_id},
             access_token=self.access_token,
         )
-        product_info = result.get("product", {})
+        product_info = result.get("product") or result
         return self._parse_product(product_info)
 
     async def fetch_updated_products(self, since: datetime) -> list[ProductDTO]:
         """拉取指定时间后变更的商品"""
         timestamp = int(since.timestamp())
         result = await self.client.call_api(
-            endpoint="/product/list",
+            endpoint="/product/listV2",
+            api_method="product.listV2",
             params={
                 "page": 1,
                 "size": 100,
@@ -84,13 +108,14 @@ class DouyinAdapter(BasePlatformAdapter):
             },
             access_token=self.access_token,
         )
-        product_list = result.get("list", [])
+        product_list = result.get("list") or result.get("product_list") or []
         return [self._parse_product(p) for p in product_list]
 
     async def upload_image(self, product_id: str, image_url: str) -> str:
         """上传图片到抖音"""
         result = await self.client.call_api(
             endpoint="/material/upload_image_by_url",
+            api_method="material.upload_image_by_url",
             params={"url": image_url},
             access_token=self.access_token,
         )
@@ -100,6 +125,7 @@ class DouyinAdapter(BasePlatformAdapter):
         """上传视频到抖音"""
         result = await self.client.call_api(
             endpoint="/material/upload_video_by_url",
+            api_method="material.upload_video_by_url",
             params={"url": video_url},
             access_token=self.access_token,
         )
@@ -110,7 +136,8 @@ class DouyinAdapter(BasePlatformAdapter):
         params = {"product_id": product_id, **data}
         try:
             await self.client.call_api(
-                endpoint="/product/edit",
+                endpoint="/product/editV2",
+                api_method="product.editV2",
                 params=params,
                 access_token=self.access_token,
             )
@@ -133,46 +160,57 @@ class DouyinAdapter(BasePlatformAdapter):
             "size": page_size,
         }
         if start_time:
-            params["start_time"] = int(start_time.timestamp())
+            params["create_time_start"] = int(start_time.timestamp())
         if end_time:
-            params["end_time"] = int(end_time.timestamp())
+            params["create_time_end"] = int(end_time.timestamp())
         if status:
-            # 抖音订单状态映射
+            # 抖店主状态过滤
             status_map = {
                 "pending": 1,
                 "paid": 2,
                 "shipped": 3,
-                "completed": 4,
+                "completed": 5,
+                "cancelled": 4,
             }
             if status in status_map:
-                params["order_status"] = status_map[status]
+                params["main_status"] = status_map[status]
 
         result = await self.client.call_api(
-            endpoint="/order/list",
+            endpoint="/order/searchList",
+            api_method="order.searchList",
             params=params,
             access_token=self.access_token,
         )
 
-        order_list = result.get("list", [])
+        order_list = result.get("shop_order_list", [])
         total = result.get("total", 0)
 
         orders = [self._parse_order(o) for o in order_list]
 
         return PageResult(items=orders, total=total, page=page, page_size=page_size)
 
+    @staticmethod
+    def _parse_ts(ts: Any) -> datetime | None:
+        if not ts:
+            return None
+        try:
+            return datetime.fromtimestamp(int(ts))
+        except Exception:
+            return None
+
     def _parse_order(self, raw: dict) -> OrderDTO:
         """将抖音订单原始数据转为 OrderDTO"""
         return OrderDTO(
-            platform_order_id=str(raw.get("order_id", "")),
+            platform_order_id=str(raw.get("order_id") or ""),
             product_id=str(raw.get("product_id", "")),
             product_title=raw.get("product_name", ""),
-            buyer_id=str(raw.get("buyer_id", "")),
+            buyer_id=str(raw.get("doudian_open_id") or raw.get("open_id") or raw.get("buyer_id") or ""),
             quantity=raw.get("item_num", 1),
-            unit_price=float(raw.get("price", 0)) / 100,
-            total_amount=float(raw.get("pay_amount", 0)) / 100,
-            status=self._map_order_status(raw.get("order_status", 0)),
-            paid_at=datetime.fromtimestamp(raw["pay_time"]) if raw.get("pay_time") else None,
-            shipped_at=datetime.fromtimestamp(raw["ship_time"]) if raw.get("ship_time") else None,
+            unit_price=float(raw.get("order_amount", 0)) / 100 if raw.get("order_amount") else 0.0,
+            total_amount=float(raw.get("pay_amount", 0)) / 100 if raw.get("pay_amount") else 0.0,
+            status=self._map_order_status(raw.get("order_status") or raw.get("main_status") or 0),
+            paid_at=self._parse_ts(raw.get("pay_time")),
+            shipped_at=self._parse_ts(raw.get("exp_ship_time")),
             platform_data=raw,
         )
 
@@ -192,9 +230,10 @@ class DouyinAdapter(BasePlatformAdapter):
     async def fetch_order_detail(self, order_id: str) -> OrderDTO:
         """获取抖音订单详情"""
         result = await self.client.call_api(
-            endpoint="/order/detail",
-            params={"order_id": order_id},
+            endpoint="/order/orderDetail",
+            api_method="order.orderDetail",
+            params={"shop_order_id": order_id},
             access_token=self.access_token,
         )
-        order_info = result.get("order", {})
+        order_info = result.get("shop_order_detail", {})
         return self._parse_order(order_info)

@@ -148,9 +148,14 @@ export default function ChatPage() {
       // Human takeover mode
       setSending(true);
       try {
-        // 拼多多平台会话走平台回复 API，其他走通用 REST
+        // 平台会话走对应平台回复 API，其他走通用 REST
         if (currentConversation.platform_type === 'pinduoduo') {
           const response = await platformApi.sendPlatformMessage(selectedId, content);
+          if (!response.success) {
+            message.error('发送失败');
+          }
+        } else if (currentConversation.platform_type === 'douyin') {
+          const response = await platformApi.sendDouyinMessage(selectedId, content);
           if (!response.success) {
             message.error('发送失败');
           }

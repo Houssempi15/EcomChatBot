@@ -2,6 +2,7 @@
 平台消息处理服务
 处理来自电商平台（拼多多等）的 Webhook 消息
 """
+import json
 import logging
 from datetime import datetime
 
@@ -123,90 +124,155 @@ class PlatformMessageService:
                 config=config,
             )
 
-    async def handle_douyin_webhook(self, payload: dict) -> None:
+    async def handle_douyin_webhook(self, payload: dict | list) -> None:
         """
         处理抖音 Webhook 推送
 
-        payload 字段（参考抖音开放平台文档）：
-          - shop_id: 店铺ID
-          - buyer_id: 买家ID
-          - conversation_id: 抖音会话ID
-          - content: 消息内容
-          - msg_type: 消息类型（text=文本）
+        兼容两种消息格式：
+        1) 旧格式：{shop_id,buyer_id,conversation_id,content,msg_type}
+        2) 官方格式：[{tag,msg_id,data}]，其中 data 为对象或 JSON 字符串
         """
-        shop_id = str(payload.get("shop_id", ""))
-        buyer_id = str(payload.get("buyer_id", ""))
-        douyin_conversation_id = str(payload.get("conversation_id", ""))
-        content = payload.get("content", "")
-        msg_type = payload.get("msg_type", "text")
-
-        # 只处理文本消息
-        if msg_type != "text" or not content:
+        messages = self._extract_douyin_text_messages(payload)
+        if not messages:
             return
 
-        # 1. 查找平台配置 → 获取 tenant_id
-        config = await self._get_platform_config("douyin", shop_id)
-        if not config:
-            logger.warning("未找到 shop_id=%s 对应的平台配置", shop_id)
-            return
+        for msg in messages:
+            shop_id = msg["shop_id"]
+            buyer_id = msg["buyer_id"]
+            douyin_conversation_id = msg["conversation_id"]
+            content = msg["content"]
 
-        tenant_id = config.tenant_id
+            # 1. 查找平台配置 → 获取 tenant_id
+            config = await self._get_platform_config("douyin", shop_id)
+            if not config:
+                logger.warning("未找到 shop_id=%s 对应的平台配置", shop_id)
+                continue
 
-        # 2. 查找或创建用户
-        conv_service = ConversationService(self.db, tenant_id)
-        user_external_id = f"douyin_{buyer_id}"
-        user = await conv_service.get_or_create_user(
-            user_external_id=user_external_id,
-            user_data={"nickname": f"抖音买家{buyer_id}"},
-        )
-        # 记录平台用户ID
-        if not user.platform_user_id:
-            user.platform_user_id = buyer_id
+            tenant_id = config.tenant_id
+
+            # 2. 查找或创建用户
+            conv_service = ConversationService(self.db, tenant_id)
+            user_external_id = f"douyin_{buyer_id}"
+            user = await conv_service.get_or_create_user(
+                user_external_id=user_external_id,
+                user_data={"nickname": f"抖音买家{buyer_id}"},
+            )
+            if not user.platform_user_id:
+                user.platform_user_id = buyer_id
+                await self.db.commit()
+
+            # 3. 查找或创建会话
+            conversation = await self._get_or_create_platform_conversation(
+                tenant_id=tenant_id,
+                user_id=user.id,
+                platform_type="douyin",
+                platform_conversation_id=douyin_conversation_id,
+            )
+
+            # 4. 保存用户消息
+            msg_id = f"msg_{int(datetime.utcnow().timestamp())}_{buyer_id}"
+            message = Message(
+                tenant_id=tenant_id,
+                message_id=msg_id,
+                conversation_id=conversation.conversation_id,
+                role="user",
+                content=content,
+            )
+            self.db.add(message)
             await self.db.commit()
 
-        # 3. 查找或创建会话
-        conversation = await self._get_or_create_platform_conversation(
-            tenant_id=tenant_id,
-            user_id=user.id,
-            platform_type="douyin",
-            platform_conversation_id=douyin_conversation_id,
-        )
+            # 5. 意图识别
+            from services.intent_service import IntentService
+            intent_service = IntentService(db=self.db, tenant_id=tenant_id)
+            intent = intent_service.classify_intent_by_rules(content)
+            confidence = intent_service.get_intent_confidence(content, intent)
 
-        # 4. 保存用户消息
-        msg_id = f"msg_{int(datetime.utcnow().timestamp())}_{buyer_id}"
-        message = Message(
-            tenant_id=tenant_id,
-            message_id=msg_id,
-            conversation_id=conversation.conversation_id,
-            role="user",
-            content=content,
-        )
-        self.db.add(message)
-        await self.db.commit()
+            # 6. 根据置信度决定 AI 回复还是转人工
+            threshold = config.auto_reply_threshold
+            if confidence >= threshold:
+                await self._ai_reply_douyin(
+                    db=self.db,
+                    tenant_id=tenant_id,
+                    conversation=conversation,
+                    user_input=content,
+                    config=config,
+                )
+            else:
+                await self._escalate_to_human_douyin(
+                    db=self.db,
+                    tenant_id=tenant_id,
+                    conversation=conversation,
+                    config=config,
+                )
 
-        # 5. 意图识别
-        from services.intent_service import IntentService
-        intent_service = IntentService(db=self.db, tenant_id=tenant_id)
-        intent = intent_service.classify_intent_by_rules(content)
-        confidence = intent_service.get_intent_confidence(content, intent)
+    @staticmethod
+    def _extract_douyin_text_messages(payload: dict | list) -> list[dict[str, str]]:
+        """从抖店推送体提取可处理的文本消息。"""
+        result: list[dict[str, str]] = []
+        events = payload if isinstance(payload, list) else [payload]
 
-        # 6. 根据置信度决定 AI 回复还是转人工
-        threshold = config.auto_reply_threshold
-        if confidence >= threshold:
-            await self._ai_reply_douyin(
-                db=self.db,
-                tenant_id=tenant_id,
-                conversation=conversation,
-                user_input=content,
-                config=config,
-            )
-        else:
-            await self._escalate_to_human_douyin(
-                db=self.db,
-                tenant_id=tenant_id,
-                conversation=conversation,
-                config=config,
-            )
+        for event in events:
+            if not isinstance(event, dict):
+                continue
+
+            # 兼容旧版直接字段格式
+            if {"shop_id", "buyer_id", "conversation_id"}.issubset(event.keys()):
+                content = str(event.get("content", "")).strip()
+                msg_type = event.get("msg_type", "text")
+                if msg_type in ("text", 1) and content:
+                    result.append(
+                        {
+                            "shop_id": str(event.get("shop_id", "")),
+                            "buyer_id": str(event.get("buyer_id", "")),
+                            "conversation_id": str(event.get("conversation_id", "")),
+                            "content": content,
+                        }
+                    )
+                continue
+
+            # 官方格式：[{tag,msg_id,data}]
+            data = event.get("data")
+            if isinstance(data, str):
+                try:
+                    data = json.loads(data)
+                except Exception:
+                    continue
+            if not isinstance(data, dict):
+                continue
+
+            shop_id = str(data.get("shop_id") or data.get("ShopId") or "").strip()
+            buyer_id = str(
+                data.get("buyer_id")
+                or data.get("open_id")
+                or data.get("doudian_open_id")
+                or data.get("user_id")
+                or ""
+            ).strip()
+            conversation_id = str(
+                data.get("conversation_id")
+                or data.get("conv_id")
+                or data.get("conversationId")
+                or ""
+            ).strip()
+            content = str(
+                data.get("content")
+                or data.get("text")
+                or data.get("msg_content")
+                or ""
+            ).strip()
+
+            # 官方大多数推送不是 IM 文本消息，不强行处理
+            if shop_id and buyer_id and conversation_id and content:
+                result.append(
+                    {
+                        "shop_id": shop_id,
+                        "buyer_id": buyer_id,
+                        "conversation_id": conversation_id,
+                        "content": content,
+                    }
+                )
+
+        return result
 
     async def _get_or_create_platform_conversation(
         self,
@@ -232,7 +298,7 @@ class PlatformMessageService:
                 tenant_id=tenant_id,
                 conversation_id=generate_conversation_id(),
                 user_id=user_id,
-                channel="pinduoduo",
+                channel=platform_type,
                 platform_type=platform_type,
                 platform_conversation_id=platform_conversation_id,
                 status="active",

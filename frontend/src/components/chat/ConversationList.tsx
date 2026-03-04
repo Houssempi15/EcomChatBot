@@ -64,6 +64,7 @@ function ConversationList({
   const getPlatformLabel = (platform: string): string => {
     const labels: Record<string, string> = {
       pinduoduo: '拼多多',
+      douyin: '抖音抖店',
       taobao: '淘宝',
       jd: '京东',
     };
@@ -73,6 +74,7 @@ function ConversationList({
   const getPlatformColor = (platform: string): string => {
     const colors: Record<string, string> = {
       pinduoduo: 'orange',
+      douyin: 'geekblue',
       taobao: 'red',
       jd: 'blue',
     };
@@ -109,6 +111,7 @@ function ConversationList({
             onChange={onPlatformFilterChange}
             options={[
               { value: 'pinduoduo', label: '拼多多' },
+              { value: 'douyin', label: '抖音抖店' },
               { value: 'taobao', label: '淘宝' },
               { value: 'jd', label: '京东' },
             ]}
