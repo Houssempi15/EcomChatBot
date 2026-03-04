@@ -5,9 +5,12 @@ services:
   nginx:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/conf.d/ecomchat.conf:/etc/nginx/conf.d/ecomchat.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
       - nginx_logs:/var/log/nginx
+    command: >
+      sh -c "mkdir -p /var/cache/nginx/static && nginx -g 'daemon off;'"
     ports:
       - "80:80"
       - "443:443"
