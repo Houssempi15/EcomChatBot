@@ -1,6 +1,10 @@
-# 电商智能客服 & AI 内容生成 SaaS 平台
+<div align="center">
+  <img src="./frontend/public/logos/logo.svg" alt="EcomChat Logo" width="200"/>
 
-基于大模型的多租户电商 SaaS 平台，集智能客服、AI 内容生成、商品管理、智能定价于一体，提供完整的前后端解决方案。
+  # 电商智能客服 & AI 内容生成 SaaS 平台
+
+  基于大模型的多租户电商 SaaS 平台，集智能客服、AI 内容生成、商品管理、智能定价于一体，提供完整的前后端解决方案。
+</div>
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
