@@ -25,7 +25,7 @@ const Tooltip: React.FC<TooltipProps> = ({
   const timeoutRef = useRef<NodeJS.Timeout>();
 
   // 计算 tooltip 位置
-  const calculatePosition = () => {
+  const calculatePosition = React.useCallback(() => {
     if (!triggerRef.current || !tooltipRef.current) return;
 
     const triggerRect = triggerRef.current.getBoundingClientRect();
@@ -66,7 +66,7 @@ const Tooltip: React.FC<TooltipProps> = ({
     }
 
     setPosition({ top, left });
-  };
+  }, [placement]);
 
   const handleMouseEnter = () => {
     if (disabled) return;
@@ -86,7 +86,7 @@ const Tooltip: React.FC<TooltipProps> = ({
     if (visible) {
       calculatePosition();
     }
-  }, [visible]);
+  }, [visible, calculatePosition]);
 
   // 监听滚动和窗口大小变化
   useEffect(() => {
@@ -103,7 +103,7 @@ const Tooltip: React.FC<TooltipProps> = ({
       window.removeEventListener('scroll', handleUpdate, true);
       window.removeEventListener('resize', handleUpdate);
     };
-  }, [visible]);
+  }, [visible, calculatePosition]);
 
   // 清理定时器
   useEffect(() => {

@@ -33,8 +33,7 @@ const Select = React.forwardRef<HTMLDivElement, SelectProps>(
       searchable = false,
       className,
       size = 'md',
-    },
-    ref
+    }
   ) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { message } from 'antd';
 import { settingsApi, DiscoveredModel } from '@/lib/api/settings';
-import { ModelProvider, ModelType } from '@/types';
 
 interface PlatformConfig {
   api_key: string;
