@@ -200,15 +200,15 @@ export const animation = {
 // ============ Z-index 层级 ============
 
 export const zIndex = {
-  base: 0,
-  dropdown: 1000,
-  sticky: 1020,
-  fixed: 1030,
-  modalBackdrop: 1040,
-  modal: 1050,
-  popover: 1060,
-  tooltip: 1070,
-} as const;
+  base: '0',
+  dropdown: '1000',
+  sticky: '1020',
+  fixed: '1030',
+  modalBackdrop: '1040',
+  modal: '1050',
+  popover: '1060',
+  tooltip: '1070',
+};
 
 // ============ 断点系统 ============
 
