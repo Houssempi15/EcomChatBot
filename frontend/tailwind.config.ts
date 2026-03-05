@@ -1,4 +1,18 @@
 import type { Config } from "tailwindcss";
+import {
+  brandColors,
+  functionalColors,
+  neutralColors,
+  spacing,
+  borderRadius,
+  shadows,
+  fontFamily,
+  fontSize,
+  fontWeight,
+  animation,
+  zIndex,
+  breakpoints,
+} from "./src/styles/tokens";
 
 const config: Config = {
   content: [
@@ -9,29 +23,46 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // 品牌色
+        brand: brandColors,
+        // 功能色
+        success: functionalColors.success,
+        warning: functionalColors.warning,
+        error: functionalColors.error,
+        info: functionalColors.info,
+        // 中性色
+        neutral: neutralColors,
+        // 语义色别名
+        primary: {
+          DEFAULT: brandColors[500],
+          light: brandColors[400],
+          dark: brandColors[600],
+          50: brandColors[50],
+          100: brandColors[100],
+          200: brandColors[200],
+          300: brandColors[300],
+          400: brandColors[400],
+          500: brandColors[500],
+          600: brandColors[600],
+          700: brandColors[700],
+          800: brandColors[800],
+          900: brandColors[900],
+          950: brandColors[950],
+        },
+        // CSS 变量支持
         background: "var(--background)",
         foreground: "var(--foreground)",
-        primary: {
-          DEFAULT: "#6366F1",
-          light: "#818CF8",
-          dark: "#4F46E5",
-        },
-        cta: {
-          DEFAULT: "#10B981",
-          light: "#34D399",
-          dark: "#059669",
-        },
-        brand: {
-          bg: "#F5F3FF",
-          text: "#1E1B4B",
-          sidebar: "#1E1B4B",
-          "sidebar-hover": "#2D2A5E",
-          "sidebar-active": "#6366F1",
-        },
       },
-      fontFamily: {
-        sans: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
-      },
+      spacing,
+      borderRadius,
+      boxShadow: shadows,
+      fontFamily,
+      fontSize,
+      fontWeight,
+      transitionDuration: animation.duration,
+      transitionTimingFunction: animation.easing,
+      zIndex,
+      screens: breakpoints,
     },
   },
   plugins: [],

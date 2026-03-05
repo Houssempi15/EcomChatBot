@@ -119,14 +119,13 @@ export default function AdminSidebar() {
 
   return (
     <aside
-      className="fixed left-0 top-0 h-screen w-[200px] z-50"
-      style={{ background: '#001529' }}
+      className="fixed left-0 top-0 h-screen w-[200px] z-50 bg-[var(--sidebar-bg)] transition-colors duration-200"
     >
       <div className="flex flex-col h-full">
         {/* Logo */}
-        <div className="h-16 flex items-center px-6 border-b border-gray-700">
-          <SettingOutlined className="text-2xl text-blue-400 mr-3" />
-          <Text strong style={{ color: '#fff', fontSize: '1.05rem' }}>
+        <div className="h-16 flex items-center px-6 border-b border-neutral-700 dark:border-neutral-800">
+          <SettingOutlined className="text-2xl text-primary mr-3 transition-colors" />
+          <Text strong className="text-white text-[1.05rem]">
             平台管理
           </Text>
         </div>
@@ -147,25 +146,22 @@ export default function AdminSidebar() {
         {/* Admin Profile */}
         <div className="p-3">
           <div
-            className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl"
-            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}
+            className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-white/[0.07] border border-white/10 hover:bg-white/10 transition-all duration-200"
           >
             <Avatar
               size={36}
-              style={{ background: '#1677ff', flexShrink: 0, fontWeight: 700, fontSize: '0.9rem' }}
+              className="flex-shrink-0 font-bold text-[0.9rem] bg-primary"
             >
               {admin?.username ? admin.username[0].toUpperCase() : <UserOutlined />}
             </Avatar>
             <div className="flex-1 min-w-0">
               <Text
-                className="text-white block truncate"
-                style={{ fontSize: '0.82rem', fontWeight: 600, lineHeight: '1.35', letterSpacing: '-0.01em' }}
+                className="text-white block truncate text-[0.82rem] font-semibold leading-[1.35] tracking-[-0.01em]"
               >
                 {admin?.username || '管理员'}
               </Text>
               <Text
-                className="block truncate"
-                style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.7rem', lineHeight: '1.35' }}
+                className="block truncate text-white/60 text-[0.7rem] leading-[1.35]"
               >
                 {admin?.role ? roleLabels[admin.role] || admin.role : ''}
               </Text>
@@ -174,7 +170,7 @@ export default function AdminSidebar() {
               <Button
                 type="text"
                 size="small"
-                icon={<LogoutOutlined style={{ color: 'rgba(255,255,255,0.5)' }} />}
+                icon={<LogoutOutlined className="text-white/50" />}
                 onClick={handleLogout}
                 className="hover:!bg-white/10 transition-colors flex-shrink-0"
               />
