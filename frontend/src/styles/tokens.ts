@@ -154,9 +154,9 @@ export const shadows = {
 // ============ 字体系统 ============
 
 export const fontFamily = {
-  sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
-  mono: ['Fira Code', 'Consolas', 'Monaco', 'monospace'],
-} as const;
+  sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'] as string[],
+  mono: ['Fira Code', 'Consolas', 'Monaco', 'monospace'] as string[],
+};
 
 export const fontSize = {
   xs: ['0.75rem', { lineHeight: '1rem' }],      // 12px
