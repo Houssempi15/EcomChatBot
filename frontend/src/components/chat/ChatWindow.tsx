@@ -1,7 +1,8 @@
 'use client';
 
 import { useRef, useEffect } from 'react';
-import { Button, Input, Tag, Typography, Spin, Empty, Badge } from 'antd';
+import { Button, Input, Tag, Typography, Badge } from 'antd';
+import Skeleton from '@/components/ui/Loading/Skeleton';
 import { SendOutlined } from '@ant-design/icons';
 import MessageBubble from './MessageBubble';
 import { Message, ConversationDetail } from '@/types';
@@ -54,8 +55,14 @@ export default function ChatWindow({
 
   if (!conversation) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-50">
-        <Empty description="选择一个会话开始" />
+      <div className="flex-1 flex flex-col items-center justify-center bg-neutral-50 text-center px-8">
+        <div className="w-20 h-20 rounded-full bg-brand-100 flex items-center justify-center mb-4">
+          <SendOutlined className="text-3xl text-brand-400" />
+        </div>
+        <Text strong className="text-lg mb-2">选择一个会话开始</Text>
+        <Text type="secondary" className="text-sm max-w-xs">
+          从左侧列表选择一个会话，或等待新的客户咨询
+        </Text>
       </div>
     );
   }
@@ -65,9 +72,9 @@ export default function ChatWindow({
   const inputDisabled = isClosed;
 
   return (
-    <div className="flex-1 flex flex-col bg-gray-50">
+    <div className="flex-1 flex flex-col bg-neutral-50">
       {/* Header */}
-      <div className="h-16 px-5 flex items-center justify-between bg-white border-b border-gray-200">
+      <div className="h-16 px-5 flex items-center justify-between bg-white border-b border-neutral-200">
         <div className="flex items-center gap-3">
           <Text strong>{formatUserId(conversation.user_external_id)}</Text>
           {isWaiting ? (
@@ -95,8 +102,19 @@ export default function ChatWindow({
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-5">
         {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <Spin tip="加载消息中..." />
+          <div className="space-y-4 p-4">
+            <div className="flex justify-start">
+              <Skeleton variant="rectangular" width="55%" height={44} />
+            </div>
+            <div className="flex justify-end">
+              <Skeleton variant="rectangular" width="45%" height={36} />
+            </div>
+            <div className="flex justify-start">
+              <Skeleton variant="rectangular" width="65%" height={56} />
+            </div>
+            <div className="flex justify-end">
+              <Skeleton variant="rectangular" width="40%" height={36} />
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
@@ -109,7 +127,7 @@ export default function ChatWindow({
       </div>
 
       {/* Input Area */}
-      <div className="p-5 bg-white border-t border-gray-200">
+      <div className="p-5 bg-white border-t border-neutral-200">
         <TextArea
           value={inputValue}
           onChange={(e) => onInputChange(e.target.value)}

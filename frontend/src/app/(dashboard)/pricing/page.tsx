@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   Card, Table, Button, Input, InputNumber, Select, Space, Tag,
   message, Modal, Form, Typography, Descriptions, Row, Col,
-  Statistic, Popconfirm, Spin,
+  Statistic, Popconfirm,
 } from 'antd';
 import {
   DollarOutlined, PlusOutlined, DeleteOutlined,
@@ -16,6 +16,7 @@ import { pricingApi } from '@/lib/api/pricing';
 import { productApi } from '@/lib/api/product';
 import type { CompetitorProduct, PricingAnalysis } from '@/lib/api/pricing';
 import type { Product } from '@/types';
+import Skeleton from '@/components/ui/Loading/Skeleton';
 
 const { Text, Title, Paragraph } = Typography;
 
@@ -441,8 +442,10 @@ export default function PricingPage() {
                   </Space>
 
                   {analyzing && (
-                    <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                      <Spin tip="正在分析定价..." />
+                    <div className="py-5 space-y-3">
+                      <Skeleton variant="text" width="80%" />
+                      <Skeleton variant="text" width="60%" />
+                      <Skeleton variant="rectangular" height={60} />
                     </div>
                   )}
 

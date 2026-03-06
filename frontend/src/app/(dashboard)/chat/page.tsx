@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { message, Spin } from 'antd';
+import { message, Button } from 'antd';
+import { ArrowLeftOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import Skeleton from '@/components/ui/Loading/Skeleton';
 import {
   ConversationList,
   ChatWindow,
@@ -14,6 +16,8 @@ import { useConversationStore } from '@/store/conversationStore';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { Message } from '@/types';
 
+type MobileView = 'list' | 'chat' | 'detail';
+
 export default function ChatPage() {
   const searchParams = useSearchParams();
   const initialId = searchParams.get('id');
@@ -22,8 +26,11 @@ export default function ChatPage() {
   const [inputValue, setInputValue] = useState('');
   const [searchValue, setSearchValue] = useState('');
   const [sending, setSending] = useState(false);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileView, setMobileView] = useState<MobileView>('list');
 
-  // Zustand selector — 细粒度订阅，避免全量重渲染
+  // Zustand selector
   const conversations = useConversationStore(s => s.conversations);
   const currentConversation = useConversationStore(s => s.currentConversation);
   const messages = useConversationStore(s => s.messages);
@@ -47,11 +54,21 @@ export default function ChatPage() {
 
   const streamingIdRef = useRef<string | null>(null);
 
-  // 用 ref 持有最新的 fetchConversations，避免 effect 依赖函数引用导致无限重渲染
   const fetchConversationsRef = useRef(fetchConversations);
   fetchConversationsRef.current = fetchConversations;
 
-  // Initial load + 30s polling（空依赖，只挂载一次）
+  // Responsive detection
+  const handleResize = useCallback(() => {
+    setIsMobile(window.innerWidth < 768);
+  }, []);
+
+  useEffect(() => {
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [handleResize]);
+
+  // Initial load + 30s polling
   useEffect(() => {
     fetchConversationsRef.current();
     const timer = setInterval(() => fetchConversationsRef.current(), 30000);
@@ -125,6 +142,7 @@ export default function ChatPage() {
 
   const handleSelectConversation = (id: string) => {
     setSelectedId(id);
+    if (isMobile) setMobileView('chat');
   };
 
   const handleSendMessage = async () => {
@@ -145,25 +163,17 @@ export default function ChatPage() {
     setInputValue('');
 
     if (currentConversation?.status === 'waiting') {
-      // Human takeover mode
       setSending(true);
       try {
-        // 平台会话走对应平台回复 API，其他走通用 REST
         if (currentConversation.platform_type === 'pinduoduo') {
           const response = await platformApi.sendPlatformMessage(selectedId, content);
-          if (!response.success) {
-            message.error('发送失败');
-          }
+          if (!response.success) message.error('发送失败');
         } else if (currentConversation.platform_type === 'douyin') {
           const response = await platformApi.sendDouyinMessage(selectedId, content);
-          if (!response.success) {
-            message.error('发送失败');
-          }
+          if (!response.success) message.error('发送失败');
         } else {
           const response = await conversationApi.sendMessage(selectedId, { content });
-          if (!response.success) {
-            message.error(response.error?.message || '发送失败');
-          }
+          if (!response.success) message.error(response.error?.message || '发送失败');
         }
       } catch {
         message.error('发送消息失败');
@@ -171,7 +181,6 @@ export default function ChatPage() {
         setSending(false);
       }
     } else {
-      // AI mode: use WebSocket
       wsSend(content);
     }
   };
@@ -209,14 +218,96 @@ export default function ChatPage() {
 
   if (isLoading && conversations.length === 0) {
     return (
-      <div className="h-[calc(100vh-64px-48px)] flex items-center justify-center">
-        <Spin size="large" tip="加载中..." />
+      <div className="h-[calc(100vh-64px-48px)] flex bg-white rounded-lg overflow-hidden shadow">
+        <div className="w-80 flex-shrink-0 border-r border-neutral-200 p-4 max-md:hidden">
+          <Skeleton variant="rectangular" height={36} className="mb-4" />
+          <Skeleton variant="list" rows={6} />
+        </div>
+        <div className="flex-1 p-6">
+          <div className="flex items-center gap-3 mb-6 pb-4 border-b border-neutral-200">
+            <Skeleton variant="circular" width={40} height={40} />
+            <div className="flex-1">
+              <Skeleton variant="text" width="30%" />
+              <Skeleton variant="text" width="20%" className="mt-1" />
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div className="flex justify-start">
+              <Skeleton variant="rectangular" width="60%" height={48} />
+            </div>
+            <div className="flex justify-end">
+              <Skeleton variant="rectangular" width="50%" height={36} />
+            </div>
+            <div className="flex justify-start">
+              <Skeleton variant="rectangular" width="70%" height={60} />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
+  // Mobile: three-level navigation
+  if (isMobile) {
+    return (
+      <div className="h-[calc(100vh-64px-48px)] bg-white rounded-lg overflow-hidden shadow animate-fade-in">
+        {mobileView === 'list' && (
+          <ConversationList
+            conversations={filteredConversations}
+            selectedId={selectedId}
+            onSelect={handleSelectConversation}
+            searchValue={searchValue}
+            onSearchChange={setSearchValue}
+            statusFilter={statusFilter}
+            onStatusFilterChange={handleStatusFilterChange}
+            platformFilter={platformFilter}
+            onPlatformFilterChange={setPlatformFilter}
+            pagination={pagination}
+            onPageChange={handlePageChange}
+            loading={isLoading}
+          />
+        )}
+        {mobileView === 'chat' && (
+          <div className="h-full flex flex-col">
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-neutral-200 bg-white">
+              <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => setMobileView('list')} size="small" />
+              <span className="text-sm font-medium flex-1">对话</span>
+              <Button type="text" icon={<InfoCircleOutlined />} onClick={() => setMobileView('detail')} size="small" />
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <ChatWindow
+                conversation={currentConversation}
+                messages={messages}
+                inputValue={inputValue}
+                onInputChange={setInputValue}
+                onSend={handleSendMessage}
+                onClose={handleCloseConversation}
+                onTakeover={handleTakeover}
+                sending={sending}
+                loading={isLoading && !!selectedId && !currentConversation}
+                wsConnected={isConnected}
+              />
+            </div>
+          </div>
+        )}
+        {mobileView === 'detail' && (
+          <div className="h-full flex flex-col">
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-neutral-200 bg-white">
+              <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => setMobileView('chat')} size="small" />
+              <span className="text-sm font-medium">详情</span>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <RightPanel user={currentConversation?.user || null} ragSources={ragSources} />
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Desktop: three-column layout
   return (
-    <div className="h-[calc(100vh-64px-48px)] flex bg-white rounded-lg overflow-hidden shadow">
+    <div className="h-[calc(100vh-64px-48px)] flex bg-white rounded-lg overflow-hidden shadow animate-fade-in">
       {/* Conversation List */}
       <div className="w-80 flex-shrink-0">
         <ConversationList
@@ -249,8 +340,21 @@ export default function ChatPage() {
         wsConnected={isConnected}
       />
 
-      {/* Right Panel */}
-      <RightPanel user={currentConversation?.user || null} ragSources={ragSources} />
+      {/* Right Panel - Collapsible */}
+      {rightPanelOpen && selectedId && (
+        <RightPanel user={currentConversation?.user || null} ragSources={ragSources} />
+      )}
+      {selectedId && !rightPanelOpen && (
+        <div className="border-l border-neutral-200">
+          <Button
+            type="text"
+            icon={<InfoCircleOutlined />}
+            onClick={() => setRightPanelOpen(true)}
+            className="m-2"
+            title="展开详情面板"
+          />
+        </div>
+      )}
     </div>
   );
 }

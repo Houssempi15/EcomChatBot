@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Row, Col, Card, Spin, message, Typography } from 'antd';
+import { Row, Col, Card, message, Typography } from 'antd';
+import Skeleton from '@/components/ui/Loading/Skeleton';
 import { PlatformOverview, PlanDistribution } from '@/components/admin/statistics';
 import { adminStatisticsApi } from '@/lib/api/admin';
 import { PlatformStatistics } from '@/types/admin';
@@ -33,14 +34,37 @@ export default function StatisticsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Spin size="large" tip="加载中..." />
+      <div className="space-y-6">
+        <Skeleton variant="text" width="20%" height={28} />
+        <Row gutter={[16, 16]}>
+          {[0, 1, 2, 3].map((i) => (
+            <Col xs={24} sm={12} lg={6} key={i}>
+              <div className="bg-white rounded-xl p-5 border border-neutral-200">
+                <Skeleton variant="text" width="50%" />
+                <Skeleton variant="rectangular" height={32} className="mt-3" />
+              </div>
+            </Col>
+          ))}
+        </Row>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} lg={8}>
+            <div className="bg-white rounded-xl p-5 border border-neutral-200">
+              <Skeleton variant="rectangular" height={200} />
+            </div>
+          </Col>
+          <Col xs={24} lg={16}>
+            <div className="bg-white rounded-xl p-5 border border-neutral-200">
+              <Skeleton variant="text" width="30%" className="mb-3" />
+              <Skeleton variant="rectangular" height={150} />
+            </div>
+          </Col>
+        </Row>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <Title level={4}>统计概览</Title>
 
       {/* Overview cards */}

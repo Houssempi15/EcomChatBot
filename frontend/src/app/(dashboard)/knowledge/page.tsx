@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Row, Col, Card, Button, Statistic, message, Typography, Spin, Form, Select, Alert } from 'antd';
+import { Row, Col, Card, Button, Statistic, message, Typography, Form, Select, Alert } from 'antd';
+import Skeleton from '@/components/ui/Loading/Skeleton';
 import { PlusOutlined, FileTextOutlined, AppstoreOutlined, CloudOutlined } from '@ant-design/icons';
 import {
   DocumentList,
@@ -390,8 +391,8 @@ export default function KnowledgePage() {
       {/* Document List */}
       <Card title="文档列表">
         {loading && !searching ? (
-          <div className="flex justify-center py-12">
-            <Spin size="large" />
+          <div className="py-4">
+            <Skeleton variant="table" rows={5} />
           </div>
         ) : (
           <DocumentList

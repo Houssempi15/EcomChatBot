@@ -1,9 +1,12 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { Layout, Breadcrumb, Badge } from 'antd';
-import { BellOutlined, HomeOutlined } from '@ant-design/icons';
+import { Layout, Breadcrumb, Badge, Button, Dropdown } from 'antd';
+import type { MenuProps } from 'antd';
+import { BellOutlined, HomeOutlined, MenuOutlined, SunOutlined, MoonOutlined } from '@ant-design/icons';
 import Link from 'next/link';
+import { useTheme } from 'next-themes';
+import { useUIStore } from '@/store';
 
 const { Header: AntHeader } = Layout;
 
@@ -27,6 +30,8 @@ const pathNames: Record<string, string> = {
 
 export default function Header() {
   const pathname = usePathname();
+  const { setMobileSidebarOpen } = useUIStore();
+  const { theme, setTheme } = useTheme();
   const pathParts = pathname.split('/').filter(Boolean);
 
   const breadcrumbItems = [
@@ -50,14 +55,40 @@ export default function Header() {
     })),
   ];
 
-  return (
-    <AntHeader className="bg-white flex items-center justify-between shadow-sm sticky top-0 z-10" style={{ padding: '0 16px', height: 64, lineHeight: '64px' }}>
-      <Breadcrumb items={breadcrumbItems} />
+  const notificationItems: MenuProps['items'] = [
+    {
+      key: '1',
+      label: '暂无新通知',
+      disabled: true,
+    },
+  ];
 
-      <div className="flex items-center gap-6">
-        <Badge count={0} size="small">
-          <BellOutlined className="text-lg text-gray-600 cursor-pointer hover:text-blue-600" />
-        </Badge>
+  return (
+    <AntHeader className="bg-white flex items-center justify-between shadow-sm sticky top-0 z-10 px-4 h-16 leading-[64px]">
+      <div className="flex items-center gap-3">
+        <Button
+          type="text"
+          icon={<MenuOutlined />}
+          onClick={() => setMobileSidebarOpen(true)}
+          className="md:!hidden flex items-center justify-center"
+          size="large"
+        />
+        <Breadcrumb items={breadcrumbItems} />
+      </div>
+
+      <div className="flex items-center gap-4">
+        <Button
+          type="text"
+          icon={theme === 'dark' ? <SunOutlined /> : <MoonOutlined />}
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          className="text-neutral-500 hover:!text-brand-500 transition-colors"
+          title={theme === 'dark' ? '切换亮色模式' : '切换暗色模式'}
+        />
+        <Dropdown menu={{ items: notificationItems }} placement="bottomRight">
+          <Badge count={0} size="small">
+            <BellOutlined className="text-lg text-neutral-500 cursor-pointer hover:text-brand-500 transition-colors" />
+          </Badge>
+        </Dropdown>
       </div>
     </AntHeader>
   );

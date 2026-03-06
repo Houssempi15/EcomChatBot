@@ -49,9 +49,21 @@ const config: Config = {
           900: brandColors[900],
           950: brandColors[950],
         },
-        // CSS 变量支持
+        // CSS 变量语义色
         background: "var(--background)",
         foreground: "var(--foreground)",
+        card: "var(--card-bg)",
+        "sidebar-bg": "var(--sidebar-bg)",
+        "sidebar-hover": "var(--sidebar-hover)",
+        "sidebar-active": "var(--sidebar-active)",
+      },
+      borderColor: {
+        DEFAULT: "var(--border)",
+      },
+      textColor: {
+        heading: "var(--text-primary)",
+        body: "var(--text-secondary)",
+        muted: "var(--text-tertiary)",
       },
       spacing,
       borderRadius,

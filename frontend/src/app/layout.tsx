@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { AntdRegistry } from '@ant-design/nextjs-registry';
 import AntdConfigProvider from '@/components/AntdConfigProvider';
+import ThemeProvider from '@/components/ThemeProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -17,11 +18,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" suppressHydrationWarning>
       <body>
-        <AntdRegistry>
-          <AntdConfigProvider>{children}</AntdConfigProvider>
-        </AntdRegistry>
+        <ThemeProvider>
+          <AntdRegistry>
+            <AntdConfigProvider>{children}</AntdConfigProvider>
+          </AntdRegistry>
+        </ThemeProvider>
       </body>
     </html>
   );

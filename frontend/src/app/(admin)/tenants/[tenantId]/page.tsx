@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
-  Card, Tabs, Spin, message, Modal, Tag, Typography, Select, Form,
+  Card, Tabs, message, Modal, Tag, Typography, Select, Form,
   InputNumber, Button, Table, Space, Input,
 } from 'antd';
+import Skeleton from '@/components/ui/Loading/Skeleton';
 import type { TabsProps, TableColumnsType } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { TenantDetailCard } from '@/components/admin/tenants';
@@ -207,8 +208,25 @@ export default function TenantDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Spin size="large" tip="加载中..." />
+      <div className="space-y-4">
+        <div className="flex items-center gap-4">
+          <Skeleton variant="rectangular" width={80} height={32} />
+          <Skeleton variant="text" width="30%" height={28} />
+        </div>
+        <div className="bg-white rounded-xl p-5 border border-neutral-200">
+          <Skeleton variant="text" width="20%" className="mb-4" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i}>
+                <Skeleton variant="text" width="60%" />
+                <Skeleton variant="rectangular" height={24} className="mt-2" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="bg-white rounded-xl p-5 border border-neutral-200">
+          <Skeleton variant="table" rows={4} />
+        </div>
       </div>
     );
   }
@@ -382,7 +400,7 @@ export default function TenantDetailPage() {
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 animate-fade-in">
       <div className="flex items-center gap-4">
         <Button
           icon={<ArrowLeftOutlined />}

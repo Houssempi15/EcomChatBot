@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Card, Button, Input, Select, Space, Tag, Image, message,
-  Typography, Row, Col, Spin, Empty, List,
+  Typography, Row, Col, Empty, List,
 } from 'antd';
 import {
   FileImageOutlined, SendOutlined, ReloadOutlined,
@@ -18,6 +18,7 @@ import {
 import { productApi } from '@/lib/api/product';
 import { settingsApi, type ModelConfig } from '@/lib/api/settings';
 import { usePlatformUpload } from '@/hooks/usePlatformUpload';
+import Skeleton from '@/components/ui/Loading/Skeleton';
 import type { Product } from '@/types';
 
 const { TextArea } = Input;
@@ -232,7 +233,18 @@ export default function PosterPage() {
         <Col span={14}>
           <Card title="生成结果">
             {loading ? (
-              <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>
+              <div className="py-4 px-2">
+                <Row gutter={[16, 16]}>
+                  {[0, 1, 2].map((i) => (
+                    <Col span={8} key={i}>
+                      <div className="border border-neutral-200 rounded-lg p-3">
+                        <Skeleton variant="rectangular" height={200} />
+                        <Skeleton variant="text" width="60%" className="mt-2" />
+                      </div>
+                    </Col>
+                  ))}
+                </Row>
+              </div>
             ) : assets.length === 0 ? (
               <Empty description="暂无生成结果" />
             ) : (

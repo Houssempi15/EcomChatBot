@@ -1,21 +1,20 @@
 'use client';
 
-import { ConfigProvider, App } from 'antd';
+import { ConfigProvider, App, theme as antTheme } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { ReactNode } from 'react';
+import { useTheme } from 'next-themes';
+import { brandColors, functionalColors, neutralColors } from '@/styles/tokens';
 
-const theme = {
-  token: {
-    colorPrimary: '#6366F1',      // 修复：从 #2563eb 改为 #6366F1（与 CSS 变量一致）
-    colorSuccess: '#10B981',
-    colorWarning: '#F59E0B',
-    colorError: '#EF4444',
-    colorInfo: '#3B82F6',
-    borderRadius: 6,
-    borderRadiusLG: 12,
-    colorBgContainer: '#ffffff',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif',
-  },
+const sharedToken = {
+  colorPrimary: brandColors[500],
+  colorSuccess: functionalColors.success[500],
+  colorWarning: functionalColors.warning[500],
+  colorError: functionalColors.error[500],
+  colorInfo: functionalColors.info[500],
+  borderRadius: 6,
+  borderRadiusLG: 12,
+  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif',
 };
 
 interface AntdConfigProviderProps {
@@ -23,8 +22,20 @@ interface AntdConfigProviderProps {
 }
 
 export default function AntdConfigProvider({ children }: AntdConfigProviderProps) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+
+  const themeConfig = {
+    algorithm: isDark ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
+    token: {
+      ...sharedToken,
+      colorBgContainer: isDark ? neutralColors[900] : '#ffffff',
+      colorBgElevated: isDark ? neutralColors[800] : '#ffffff',
+    },
+  };
+
   return (
-    <ConfigProvider locale={zhCN} theme={theme}>
+    <ConfigProvider locale={zhCN} theme={themeConfig}>
       <App>{children}</App>
     </ConfigProvider>
   );

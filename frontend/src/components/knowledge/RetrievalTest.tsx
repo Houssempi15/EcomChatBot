@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, Input, Button, Typography, Spin, Empty, Select, Form } from 'antd';
+import { Card, Input, Button, Typography, Empty, Select, Form } from 'antd';
+import Skeleton from '@/components/ui/Loading/Skeleton';
 import { SearchOutlined } from '@ant-design/icons';
 import { KnowledgeSearchResult } from '@/types';
 
@@ -93,8 +94,10 @@ export default function RetrievalTest({ onSearch, rerankModels }: RetrievalTestP
       )}
 
       {loading && (
-        <div className="flex items-center justify-center py-8">
-          <Spin tip="检索中..." />
+        <div className="py-6 space-y-3">
+          <Skeleton variant="text" width="80%" />
+          <Skeleton variant="text" width="60%" />
+          <Skeleton variant="text" width="70%" />
         </div>
       )}
 

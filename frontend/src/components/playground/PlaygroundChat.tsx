@@ -62,17 +62,14 @@ export default function PlaygroundChat({
             <Avatar
               size={32}
               icon={msg.role === 'user' ? <UserOutlined /> : <RobotOutlined />}
-              style={{
-                backgroundColor: msg.role === 'user' ? '#6366F1' : '#10B981',
-                flexShrink: 0,
-              }}
+              className={`flex-shrink-0 ${msg.role === 'user' ? 'bg-brand-500' : 'bg-success-500'}`}
             />
             <div className={`max-w-[70%] ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
               <div
                 className={`inline-block p-3 rounded-lg whitespace-pre-wrap ${
                   msg.role === 'user'
-                    ? 'bg-indigo-500 text-white'
-                    : 'bg-gray-100 text-gray-800'
+                    ? 'bg-brand-500 text-white'
+                    : 'bg-neutral-100 text-neutral-800'
                 }`}
               >
                 {msg.content}

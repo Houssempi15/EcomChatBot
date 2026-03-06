@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Card, Input, Button, Typography, Spin, Empty, Select, Form,
+  Card, Input, Button, Typography, Empty, Select, Form,
   Tabs, Slider, Collapse, Tag, Space, Descriptions,
 } from 'antd';
 import { SearchOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { KnowledgeSearchResult } from '@/types';
 import { settingsApi, ModelConfig } from '@/lib/api/settings';
+import Skeleton from '@/components/ui/Loading/Skeleton';
 import apiClient from '@/lib/api/client';
 import { ApiResponse } from '@/types';
 
@@ -163,8 +164,10 @@ export default function EnhancedRetrievalTest({ onSearch, rerankModels }: Enhanc
           </div>
 
           {loading && (
-            <div className="flex items-center justify-center py-8">
-              <Spin tip="检索中..." />
+            <div className="py-6 space-y-3">
+              <Skeleton variant="text" width="80%" />
+              <Skeleton variant="text" width="60%" />
+              <Skeleton variant="text" width="70%" />
             </div>
           )}
 
@@ -252,8 +255,11 @@ export default function EnhancedRetrievalTest({ onSearch, rerankModels }: Enhanc
           </div>
 
           {ragLoading && (
-            <div className="flex items-center justify-center py-8">
-              <Spin tip="正在运行 RAG 流程..." />
+            <div className="py-6 space-y-3">
+              <Skeleton variant="text" width="90%" />
+              <Skeleton variant="text" width="75%" />
+              <Skeleton variant="rectangular" height={80} className="mt-2" />
+              <Skeleton variant="text" width="60%" />
             </div>
           )}
 

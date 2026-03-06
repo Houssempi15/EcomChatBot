@@ -9,7 +9,6 @@ import {
   Typography,
   message,
   Space,
-  Spin,
   Alert,
   Tag,
   Divider,
@@ -28,6 +27,7 @@ import {
 } from '@ant-design/icons';
 import { settingsApi, DiscoveredModel } from '@/lib/api/settings';
 import { ModelProvider, ModelType } from '@/types';
+import Skeleton from '@/components/ui/Loading/Skeleton';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -537,8 +537,18 @@ export default function ModelConfigForm() {
   if (loading) {
     return (
       <Card>
-        <div className="flex items-center justify-center py-16">
-          <Spin size="large" tip="加载模型配置..." />
+        <div className="py-6 px-4 space-y-4">
+          <Skeleton variant="text" width="30%" height={24} />
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="border border-neutral-200 rounded-lg p-4">
+                <Skeleton variant="circular" width={40} height={40} className="mb-3" />
+                <Skeleton variant="text" width="70%" />
+                <Skeleton variant="text" width="50%" className="mt-1" />
+              </div>
+            ))}
+          </div>
+          <Skeleton variant="rectangular" height={100} className="mt-4" />
         </div>
       </Card>
     );
@@ -576,18 +586,18 @@ export default function ModelConfigForm() {
                   size="small"
                   onClick={() => handleSelectProvider(provider)}
                   style={{
-                    border: isSelected ? '2px solid #1677ff' : '1px solid #d9d9d9',
-                    background: isSelected ? '#f0f5ff' : undefined,
+                    border: isSelected ? '2px solid var(--primary)' : '1px solid #d9d9d9',
+                    background: isSelected ? 'var(--brand-50)' : undefined,
                     cursor: 'pointer',
                     minHeight: 110,
                   }}
-                  bodyStyle={{ padding: '12px' }}
+                  styles={{ body: { padding: '12px' } }}
                 >
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center justify-between">
                       <Text strong style={{ fontSize: 14 }}>{info.name}</Text>
                       {hasConfig && (
-                        <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 14 }} />
+                        <CheckCircleOutlined className="text-success-500 text-sm" />
                       )}
                     </div>
                     <Text type="secondary" style={{ fontSize: 11 }}>{info.description}</Text>
@@ -655,9 +665,9 @@ export default function ModelConfigForm() {
                 loading={validationStatus === 'validating'}
                 icon={
                   validationStatus === 'valid' ? (
-                    <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                    <CheckCircleOutlined className="text-success-500" />
                   ) : validationStatus === 'invalid' ? (
-                    <CloseCircleOutlined style={{ color: '#ff4d4f' }} />
+                    <CloseCircleOutlined className="text-error-500" />
                   ) : validationStatus === 'validating' ? (
                     <LoadingOutlined />
                   ) : undefined
@@ -708,7 +718,7 @@ export default function ModelConfigForm() {
             const imageModels = discoveredModels.filter(m => m.model_type === 'image_generation');
             const videoModels = discoveredModels.filter(m => m.model_type === 'video_generation');
             return (
-              <div className="mb-4 p-3 rounded" style={{ background: '#f8f9fa', border: '1px solid #e8e8e8' }}>
+              <div className="mb-4 p-3 rounded bg-neutral-50 border border-neutral-200">
                 <div className="flex items-center justify-between mb-3">
                   <Text strong>检测到以下可用模型</Text>
                   <Button

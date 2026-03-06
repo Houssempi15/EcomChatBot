@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Spin } from 'antd';
 import { AdminSidebar, AdminHeader } from '@/components/admin/layout';
-import { useAdminStore } from '@/store';
+import { useAdminStore, useUIStore } from '@/store';
 import { setupApi } from '@/lib/api/admin';
 
 export default function AdminLayout({
@@ -15,7 +14,9 @@ export default function AdminLayout({
   const router = useRouter();
   const pathname = usePathname();
   const { isAuthenticated, checkAdminAuth } = useAdminStore();
+  const { sidebarCollapsed } = useUIStore();
   const [isCheckingSetup, setIsCheckingSetup] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     const checkSetupAndAuth = async () => {
@@ -57,6 +58,16 @@ export default function AdminLayout({
     checkSetupAndAuth();
   }, [checkAdminAuth, router, pathname]);
 
+  const handleResize = useCallback(() => {
+    setIsMobile(window.innerWidth < 768);
+  }, []);
+
+  useEffect(() => {
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [handleResize]);
+
   // Setup page doesn't need the sidebar/header layout
   if (pathname === '/admin-setup') {
     return <>{children}</>;
@@ -71,7 +82,10 @@ export default function AdminLayout({
   if (isCheckingSetup) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Spin size="large" tip="正在检查系统状态..." />
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-brand-200 border-t-brand-500 rounded-full animate-spin mx-auto" />
+          <p className="mt-4 text-neutral-500 text-sm">正在检查系统状态...</p>
+        </div>
       </div>
     );
   }
@@ -79,17 +93,25 @@ export default function AdminLayout({
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Spin size="large" tip="加载中..." />
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-brand-200 border-t-brand-500 rounded-full animate-spin mx-auto" />
+          <p className="mt-4 text-neutral-500 text-sm">加载中...</p>
+        </div>
       </div>
     );
   }
 
+  const marginLeft = isMobile ? 0 : sidebarCollapsed ? 64 : 200;
+
   return (
     <div className="min-h-screen">
       <AdminSidebar />
-      <div style={{ marginLeft: 200 }}>
+      <div
+        className="transition-all duration-200"
+        style={{ marginLeft }}
+      >
         <AdminHeader />
-        <main style={{ padding: '20px 16px', background: '#f3f4f6', minHeight: 'calc(100vh - 64px)' }}>
+        <main className="animate-fade-in p-5 px-4 bg-neutral-100 min-h-[calc(100vh-64px)]">
           {children}
         </main>
       </div>

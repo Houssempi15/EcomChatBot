@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Row, Col, Card, Statistic, Select, Spin, message, Typography, Table } from 'antd';
+import { Row, Col, Card, Statistic, Select, message, Typography, Table } from 'antd';
+import Skeleton from '@/components/ui/Loading/Skeleton';
 import type { ColumnsType } from 'antd/es/table';
 import { DollarOutlined } from '@ant-design/icons';
 import { RevenueChart } from '@/components/admin/statistics';
@@ -78,14 +79,41 @@ export default function RevenuePage() {
 
   if (loading && !statistics) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Spin size="large" tip="加载中..." />
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <Skeleton variant="text" width="15%" height={28} />
+          <Skeleton variant="rectangular" width={120} height={32} />
+        </div>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} sm={8}>
+            <div className="bg-white rounded-xl p-5 border border-neutral-200">
+              <Skeleton variant="text" width="40%" />
+              <Skeleton variant="rectangular" height={36} className="mt-3" />
+            </div>
+          </Col>
+          <Col xs={24} sm={16}>
+            <div className="bg-white rounded-xl p-5 border border-neutral-200">
+              <Skeleton variant="text" width="30%" className="mb-3" />
+              <Skeleton variant="rectangular" height={150} />
+            </div>
+          </Col>
+        </Row>
+        <Row gutter={[16, 16]}>
+          {[0, 1].map((i) => (
+            <Col xs={24} lg={12} key={i}>
+              <div className="bg-white rounded-xl p-5 border border-neutral-200">
+                <Skeleton variant="text" width="35%" className="mb-3" />
+                <Skeleton variant="table" rows={4} />
+              </div>
+            </Col>
+          ))}
+        </Row>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
         <Title level={4}>收入统计</Title>
         <Select

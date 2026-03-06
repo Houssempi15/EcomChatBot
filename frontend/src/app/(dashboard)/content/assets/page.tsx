@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   Card, Button, Space, Tag, Image, message, Input, Modal,
-  Typography, Row, Col, Spin, Empty, Tabs, Popconfirm, Switch,
+  Typography, Row, Col, Empty, Tabs, Popconfirm, Switch,
 } from 'antd';
 import {
   AppstoreOutlined, FileImageOutlined,
@@ -14,6 +14,7 @@ import {
 } from '@ant-design/icons';
 import { contentApi, type GeneratedAsset } from '@/lib/api/content';
 import { usePlatformUpload } from '@/hooks/usePlatformUpload';
+import Skeleton from '@/components/ui/Loading/Skeleton';
 
 const { Title, Text, Paragraph } = Typography;
 const { Search } = Input;
@@ -213,8 +214,18 @@ export default function AssetsPage() {
         </div>
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: 60 }}>
-            <Spin size="large" />
+          <div className="py-4">
+            <Row gutter={[16, 16]}>
+              {[0, 1, 2, 3, 4, 5].map((i) => (
+                <Col span={6} key={i}>
+                  <div className="border border-neutral-200 rounded-lg p-3">
+                    <Skeleton variant="rectangular" height={180} />
+                    <Skeleton variant="text" width="50%" className="mt-2" />
+                    <Skeleton variant="text" width="30%" className="mt-1" />
+                  </div>
+                </Col>
+              ))}
+            </Row>
           </div>
         ) : assets.length === 0 ? (
           <Empty description="暂无素材" />

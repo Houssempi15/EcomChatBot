@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { Alert, Button, Card, Modal, Radio, Spin, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Modal, Radio, Tag, Typography } from 'antd';
+import Skeleton from '@/components/ui/Loading/Skeleton';
 import { subscriptionApi, SubscriptionStatus, CreateOrderResponse } from '@/lib/api/subscription';
 
 const { Title, Text } = Typography;
@@ -105,7 +106,20 @@ export default function SubscriptionPanel() {
   return (
     <Card>
       <Title level={5} className="mb-4">订阅管理</Title>
-      <Spin spinning={loading}>
+      {loading ? (
+        <div className="space-y-4 py-2">
+          <Skeleton variant="text" width="40%" />
+          <Skeleton variant="rectangular" height={60} />
+          <Skeleton variant="text" width="30%" className="mt-4" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} variant="rectangular" height={80} />
+            ))}
+          </div>
+          <Skeleton variant="rectangular" height={40} className="mt-4" />
+        </div>
+      ) : (
+      <div className="animate-fade-in">
         {/* 当前订阅状态 */}
         {info && (
           <div className="mb-6 space-y-2">
@@ -177,7 +191,8 @@ export default function SubscriptionPanel() {
         >
           {paymentChannel === 'alipay' ? '支付宝' : '微信'}扫码支付 ¥{selectedPlanInfo?.price ?? '--'}
         </Button>
-      </Spin>
+      </div>
+      )}
 
       {/* 二维码弹窗 */}
       <Modal
@@ -221,12 +236,15 @@ export default function SubscriptionPanel() {
                   ¥{order.amount}
                 </Text>
                 <div className="mt-3 flex items-center justify-center gap-2 text-gray-400 text-sm">
-                  <Spin size="small" />
+                  <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
                   <span>等待支付结果...</span>
                 </div>
               </>
             ) : (
-              <Spin tip="生成二维码中..." />
+              <div className="py-8 text-center">
+                <div className="w-8 h-8 border-3 border-gray-200 border-t-blue-500 rounded-full animate-spin mx-auto" />
+                <p className="mt-3 text-neutral-500 text-sm">生成二维码中...</p>
+              </div>
             )}
           </div>
         )}

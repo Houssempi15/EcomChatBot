@@ -68,10 +68,10 @@ export default function RightPanel({ user, ragSources }: RightPanelProps) {
               {ragSources.map((source, index) => (
                 <div
                   key={source.knowledge_id || index}
-                  className="p-3 bg-sky-50 border border-sky-200 rounded-lg"
+                  className="p-3 bg-brand-50 border border-brand-200 rounded-lg"
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <Text strong className="text-sky-700 text-sm">
+                    <Text strong className="text-brand-700 text-sm">
                       {source.title}
                     </Text>
                   </div>
@@ -82,7 +82,7 @@ export default function RightPanel({ user, ragSources }: RightPanelProps) {
                     {source.content}
                   </Text>
                   <div className="mt-2 text-right">
-                    <Text className="text-sky-600 text-xs">
+                    <Text className="text-brand-600 text-xs">
                       匹配度: {Math.round(source.score * 100)}%
                     </Text>
                   </div>

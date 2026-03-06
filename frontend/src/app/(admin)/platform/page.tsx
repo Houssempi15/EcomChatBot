@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, Row, Col, Table, Typography, Space, Tag, Spin, message } from 'antd';
+import { Card, Row, Col, Table, Typography, Space, Tag, message } from 'antd';
+import Skeleton from '@/components/ui/Loading/Skeleton';
 import type { ColumnsType } from 'antd/es/table';
 import { TeamOutlined, AlertOutlined } from '@ant-design/icons';
 import PlatformOverview, { PlanDistribution } from '@/components/admin/statistics/PlatformOverview';
@@ -136,14 +137,43 @@ export default function PlatformPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Spin size="large" tip="加载中..." />
+      <div className="space-y-6">
+        <Skeleton variant="text" width="20%" height={28} />
+        <Row gutter={[16, 16]}>
+          {[0, 1, 2, 3].map((i) => (
+            <Col xs={24} sm={12} lg={6} key={i}>
+              <div className="bg-white rounded-xl p-5 border border-neutral-200">
+                <Skeleton variant="text" width="50%" />
+                <Skeleton variant="rectangular" height={32} className="mt-3" />
+                <Skeleton variant="text" width="70%" className="mt-2" />
+              </div>
+            </Col>
+          ))}
+        </Row>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} lg={8}>
+            <div className="bg-white rounded-xl p-5 border border-neutral-200">
+              <Skeleton variant="text" width="40%" className="mb-3" />
+              <Skeleton variant="rectangular" height={150} />
+            </div>
+          </Col>
+          <Col xs={24} lg={16}>
+            <div className="bg-white rounded-xl p-5 border border-neutral-200">
+              <Skeleton variant="text" width="30%" className="mb-3" />
+              <Skeleton variant="table" rows={5} />
+            </div>
+          </Col>
+        </Row>
+        <div className="bg-white rounded-xl p-5 border border-neutral-200">
+          <Skeleton variant="text" width="25%" className="mb-3" />
+          <Skeleton variant="table" rows={4} />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <Title level={4}>平台概览</Title>
 
       {/* Statistics Cards */}

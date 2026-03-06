@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Row, Col, Card, Typography, message, Alert, Form, Input, Button, Spin, Modal, Tabs } from 'antd';
+import { Row, Col, Card, Typography, message, Alert, Form, Input, Button, Modal, Tabs } from 'antd';
+import Skeleton from '@/components/ui/Loading/Skeleton';
 import { SettingsMenu, ModelConfigForm, SubscriptionPanel } from '@/components/settings';
 import { CopyOutlined, KeyOutlined, ExclamationCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import { useAuthStore } from '@/store';
@@ -260,7 +261,18 @@ export default function SettingsPage() {
               ]}
             />
 
-            <Spin spinning={pddLoading}>
+            {pddLoading ? (
+              <div className="space-y-3 py-4">
+                {[0, 1].map((i) => (
+                  <div key={i} className="bg-white rounded-lg border border-neutral-200 p-4">
+                    <Skeleton variant="text" width="30%" />
+                    <Skeleton variant="text" width="50%" className="mt-2" />
+                    <Skeleton variant="rectangular" height={32} width="20%" className="mt-3" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+            <div className="animate-fade-in">
               {selectedPlatform === 'pinduoduo' && (
                 <div>
                   {pddConfigs.map(config => (
@@ -349,7 +361,8 @@ export default function SettingsPage() {
                   </Button>
                 </div>
               )}
-            </Spin>
+            </div>
+            )}
 
             <PlatformConfigModal
               visible={showAddModal || !!editingConfig}

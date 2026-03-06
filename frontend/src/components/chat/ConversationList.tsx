@@ -1,7 +1,8 @@
 'use client';
 
 import { memo } from 'react';
-import { Input, List, Tag, Typography, Spin, Segmented, Pagination, Select } from 'antd';
+import { Input, List, Tag, Typography, Segmented, Pagination, Select } from 'antd';
+import Skeleton from '@/components/ui/Loading/Skeleton';
 import { SearchOutlined } from '@ant-design/icons';
 import { Conversation } from '@/types';
 
@@ -122,8 +123,8 @@ function ConversationList({
       {/* List */}
       <div className="flex-1 overflow-y-auto">
         {loading ? (
-          <div className="flex items-center justify-center h-32">
-            <Spin />
+          <div className="p-3">
+            <Skeleton variant="list" rows={5} />
           </div>
         ) : (
           <List
@@ -136,7 +137,7 @@ function ConversationList({
                 <div
                   className={`
                     px-4 py-3 cursor-pointer transition-colors border-b border-gray-100
-                    ${isSelected ? 'bg-blue-50 border-l-4 border-l-blue-600' : 'hover:bg-gray-50'}
+                    ${isSelected ? 'bg-brand-50 border-l-4 border-l-brand-500' : 'hover:bg-neutral-50'}
                   `}
                   onClick={() => onSelect(item.conversation_id)}
                 >

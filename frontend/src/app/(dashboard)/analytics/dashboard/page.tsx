@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import {
-  Card, Row, Col, Statistic, Select, Space, Table, Typography, Tag, message, Spin,
+  Card, Row, Col, Statistic, Select, Space, Table, Typography, Tag, message,
 } from 'antd';
+import Skeleton from '@/components/ui/Loading/Skeleton';
 import {
   BarChartOutlined, DollarOutlined, ShoppingOutlined,
   RiseOutlined, FallOutlined, UserOutlined,
@@ -215,7 +216,47 @@ export default function SalesDashboardPage() {
         </Col>
       </Row>
 
-      <Spin spinning={loading}>
+      {loading && !overview ? (
+        <div className="space-y-6">
+          <Row gutter={16}>
+            {[0, 1, 2, 3].map((i) => (
+              <Col span={6} key={i}>
+                <div className="bg-white rounded-xl p-5 border border-neutral-200">
+                  <Skeleton variant="text" width="50%" />
+                  <Skeleton variant="rectangular" height={36} className="mt-3" />
+                </div>
+              </Col>
+            ))}
+          </Row>
+          <Row gutter={16}>
+            <Col span={16}>
+              <div className="bg-white rounded-xl p-5 border border-neutral-200">
+                <Skeleton variant="text" width="30%" className="mb-3" />
+                <Skeleton variant="rectangular" height={120} />
+              </div>
+            </Col>
+            <Col span={8}>
+              <div className="bg-white rounded-xl p-5 border border-neutral-200">
+                <Skeleton variant="text" width="40%" className="mb-3" />
+                <Skeleton variant="rectangular" height={120} />
+              </div>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col span={14}>
+              <div className="bg-white rounded-xl p-5 border border-neutral-200">
+                <Skeleton variant="table" rows={5} />
+              </div>
+            </Col>
+            <Col span={10}>
+              <div className="bg-white rounded-xl p-5 border border-neutral-200">
+                <Skeleton variant="table" rows={5} />
+              </div>
+            </Col>
+          </Row>
+        </div>
+      ) : (
+      <div className="animate-fade-in">
         {/* 核心指标 */}
         <Row gutter={16} style={{ marginBottom: 24 }}>
           <Col span={6}>
@@ -325,7 +366,8 @@ export default function SalesDashboardPage() {
             </Card>
           </Col>
         </Row>
-      </Spin>
+      </div>
+      )}
     </div>
   );
 }

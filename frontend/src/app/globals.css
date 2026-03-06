@@ -205,8 +205,96 @@ body {
   color: var(--text-primary) !important;
 }
 
+.ant-table-tbody > tr {
+  transition: background-color 200ms ease;
+  cursor: pointer;
+}
+
 .ant-table-tbody > tr:hover > td {
-  background: var(--background) !important;
+  background: var(--brand-50) !important;
+}
+
+.ant-table-tbody > tr.ant-table-row-selected > td {
+  background: var(--brand-100) !important;
+}
+
+/* ============ Ant Design 暗色模式覆盖 ============ */
+
+:root[data-theme="dark"] .ant-card {
+  background: var(--card-bg) !important;
+  border-color: var(--border) !important;
+}
+
+:root[data-theme="dark"] .ant-btn {
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .ant-btn-default {
+  background: var(--card-bg) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+:root[data-theme="dark"] .ant-btn-default:hover {
+  border-color: var(--primary) !important;
+  color: var(--primary) !important;
+}
+
+:root[data-theme="dark"] .ant-modal-content,
+:root[data-theme="dark"] .ant-modal-header {
+  background: var(--card-bg) !important;
+}
+
+:root[data-theme="dark"] .ant-dropdown-menu {
+  background: var(--card-bg) !important;
+}
+
+:root[data-theme="dark"] .ant-dropdown-menu-item {
+  color: var(--text-primary) !important;
+}
+
+:root[data-theme="dark"] .ant-select-dropdown {
+  background: var(--card-bg) !important;
+}
+
+:root[data-theme="dark"] .ant-collapse {
+  background: var(--card-bg) !important;
+  border-color: var(--border) !important;
+}
+
+:root[data-theme="dark"] .ant-tag {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+:root[data-theme="dark"] .ant-breadcrumb-link,
+:root[data-theme="dark"] .ant-breadcrumb-separator {
+  color: var(--text-secondary) !important;
+}
+
+:root[data-theme="dark"] .ant-breadcrumb-link a {
+  color: var(--text-secondary) !important;
+}
+
+:root[data-theme="dark"] .ant-breadcrumb-link a:hover {
+  color: var(--primary) !important;
+}
+
+:root[data-theme="dark"] .ant-segmented {
+  background: var(--card-bg) !important;
+}
+
+:root[data-theme="dark"] .ant-pagination .ant-pagination-item {
+  background: var(--card-bg) !important;
+  border-color: var(--border) !important;
+}
+
+:root[data-theme="dark"] .ant-pagination .ant-pagination-item a {
+  color: var(--text-primary) !important;
+}
+
+:root[data-theme="dark"] .ant-empty-description {
+  color: var(--text-secondary) !important;
 }
 
 /* ============ 全局动画关键帧 ============ */
@@ -325,6 +413,42 @@ body {
 
 .animate-spin {
   animation: spin 1s linear infinite;
+}
+
+/* ============ 交互反馈增强 ============ */
+
+/* 统一按钮过渡 */
+.ant-btn {
+  transition: all 200ms ease !important;
+}
+
+.ant-btn:active {
+  transform: scale(0.98);
+}
+
+/* 危险操作按钮视觉强化 */
+.ant-btn-dangerous {
+  font-weight: 500;
+}
+
+.ant-popconfirm .ant-btn-dangerous {
+  border-color: var(--error) !important;
+}
+
+/* 卡片可点击反馈 */
+.ant-card.ant-card-hoverable {
+  cursor: pointer;
+  transition: all 250ms ease;
+}
+
+.ant-card.ant-card-hoverable:hover {
+  transform: translateY(-2px);
+}
+
+/* 危险操作 Modal 视觉强化 */
+.ant-modal-confirm-warning .ant-modal-confirm-title,
+.ant-modal-confirm-error .ant-modal-confirm-title {
+  color: var(--error) !important;
 }
 
 /* ============ 文本样式 ============ */

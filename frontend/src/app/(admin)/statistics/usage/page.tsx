@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Row, Col, Card, Statistic, Select, Spin, message, Typography } from 'antd';
+import { Row, Col, Card, Statistic, Select, message, Typography } from 'antd';
+import Skeleton from '@/components/ui/Loading/Skeleton';
 import { ThunderboltOutlined, CloudOutlined, ApiOutlined } from '@ant-design/icons';
 import { UsageChart, TopTenantsUsage } from '@/components/admin/statistics';
 import { adminStatisticsApi } from '@/lib/api/admin';
@@ -43,14 +44,37 @@ export default function UsagePage() {
 
   if (loading && !statistics) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Spin size="large" tip="加载中..." />
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <Skeleton variant="text" width="15%" height={28} />
+          <Skeleton variant="rectangular" width={120} height={32} />
+        </div>
+        <Row gutter={[16, 16]}>
+          {[0, 1, 2].map((i) => (
+            <Col xs={24} sm={8} key={i}>
+              <div className="bg-white rounded-xl p-5 border border-neutral-200">
+                <Skeleton variant="text" width="50%" />
+                <Skeleton variant="rectangular" height={36} className="mt-3" />
+              </div>
+            </Col>
+          ))}
+        </Row>
+        <Row gutter={[16, 16]}>
+          {[0, 1].map((i) => (
+            <Col xs={24} lg={12} key={i}>
+              <div className="bg-white rounded-xl p-5 border border-neutral-200">
+                <Skeleton variant="text" width="40%" className="mb-3" />
+                <Skeleton variant="rectangular" height={200} />
+              </div>
+            </Col>
+          ))}
+        </Row>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
         <Title level={4}>用量分析</Title>
         <Select

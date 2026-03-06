@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Tag, Button, Table, Spin, Modal, message, Empty, Space, Typography, Tooltip } from 'antd';
+import { Card, Tag, Button, Table, Modal, message, Empty, Space, Typography, Tooltip } from 'antd';
+import Skeleton from '@/components/ui/Loading/Skeleton';
 import {
   LinkOutlined,
   DisconnectOutlined,
@@ -163,8 +164,31 @@ export default function PlatformManager() {
     },
   ];
 
+  if (loading) {
+    return (
+      <div>
+        <div className="mb-4 flex justify-between items-center">
+          <Skeleton variant="text" width="20%" height={24} />
+          <Skeleton variant="rectangular" width={80} height={32} />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-white rounded-lg border border-neutral-200 p-4 text-center">
+              <Skeleton variant="circular" width={40} height={40} className="mx-auto" />
+              <Skeleton variant="text" width="60%" className="mt-2 mx-auto" />
+              <Skeleton variant="rectangular" width="50%" height={22} className="mt-2 mx-auto" />
+            </div>
+          ))}
+        </div>
+        <div className="bg-white rounded-lg border border-neutral-200 p-4">
+          <Skeleton variant="table" rows={3} />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <Spin spinning={loading}>
+    <div className="animate-fade-in">
       <div className="mb-4 flex justify-between items-center">
         <Typography.Title level={5} style={{ margin: 0 }}>平台对接管理</Typography.Title>
         <Button icon={<ReloadOutlined />} onClick={loadData}>刷新</Button>
@@ -226,6 +250,6 @@ export default function PlatformManager() {
           <Empty description="暂无已连接的平台，请先连接电商平台" />
         </Card>
       )}
-    </Spin>
+    </div>
   );
 }

@@ -2,7 +2,6 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Spin } from 'antd';
 import { useAuthStore } from '@/store';
 
 export default function HomePage() {
@@ -20,7 +19,10 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center">
-      <Spin size="large" tip="加载中..." />
+      <div className="text-center">
+        <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-500 rounded-full animate-spin mx-auto" />
+        <p className="mt-4 text-neutral-500 text-sm">加载中...</p>
+      </div>
     </div>
   );
 }
