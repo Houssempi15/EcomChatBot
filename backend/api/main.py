@@ -24,6 +24,7 @@ from api.routers import (
     order,
     payment,
     platform,
+    platform_gateway,
     playground,
     pdd_webhook,
     product,
@@ -270,6 +271,7 @@ app.include_router(sensitive_word.router, prefix=settings.api_v1_prefix)
 app.include_router(audit.router, prefix=settings.api_v1_prefix)
 app.include_router(setup.router, prefix=settings.api_v1_prefix)
 app.include_router(platform.router, prefix=settings.api_v1_prefix)
+app.include_router(platform_gateway.router, prefix=settings.api_v1_prefix)
 app.include_router(playground.router, prefix=settings.api_v1_prefix)
 app.include_router(product.router, prefix=settings.api_v1_prefix)
 app.include_router(content_generation.router, prefix=settings.api_v1_prefix)
