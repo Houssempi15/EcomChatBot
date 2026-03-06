@@ -26,6 +26,7 @@ from services.platform.adapter_registry import create_adapter, get_supported_pla
 # 确保所有适配器被注册
 import services.platform.pdd_adapter  # noqa: F401
 import services.platform.douyin_adapter  # noqa: F401
+import services.platform.taobao.adapter  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
