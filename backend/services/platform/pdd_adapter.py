@@ -2,6 +2,7 @@
 import logging
 from datetime import datetime
 
+from services.platform.adapter_registry import register
 from services.platform.base_adapter import BasePlatformAdapter
 from services.platform.dto import OrderDTO, PageResult, ProductDTO
 from services.platform.pinduoduo_client import PinduoduoClient
@@ -9,6 +10,7 @@ from services.platform.pinduoduo_client import PinduoduoClient
 logger = logging.getLogger(__name__)
 
 
+@register("pinduoduo")
 class PddAdapter(BasePlatformAdapter):
     """拼多多平台适配器"""
 

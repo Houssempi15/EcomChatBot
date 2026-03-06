@@ -3,6 +3,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
+from services.platform.adapter_registry import register
 from services.platform.base_adapter import BasePlatformAdapter
 from services.platform.dto import OrderDTO, PageResult, ProductDTO
 from services.platform.douyin_client import DouyinClient
@@ -10,6 +11,7 @@ from services.platform.douyin_client import DouyinClient
 logger = logging.getLogger(__name__)
 
 
+@register("douyin")
 class DouyinAdapter(BasePlatformAdapter):
     """抖音抖店平台适配器"""
 
