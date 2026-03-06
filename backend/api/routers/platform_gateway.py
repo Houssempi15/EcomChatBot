@@ -28,6 +28,7 @@ import services.platform.pdd_adapter  # noqa: F401
 import services.platform.douyin_adapter  # noqa: F401
 import services.platform.taobao.adapter  # noqa: F401
 import services.platform.jd.adapter  # noqa: F401
+import services.platform.kuaishou.adapter  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
