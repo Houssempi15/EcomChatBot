@@ -18,7 +18,7 @@ from services.platform.platform_message_service import PlatformMessageService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/platform", tags=["平台对接"])
+router = APIRouter(prefix="/platform", tags=["平台对接（旧版）"], deprecated=True)
 
 PDD_AUTH_URL = "https://mms.pinduoduo.com/open.html"
 DOUYIN_AUTH_URL = "https://open.douyin.com/platform/oauth/connect"
