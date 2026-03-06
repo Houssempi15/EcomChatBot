@@ -1,7 +1,8 @@
 import apiClient from './client';
-import { ApiResponse } from '@/types';
+import type { ApiResponse, PlatformApp, PlatformConfig as PlatformConfigType, EcommercePlatform } from '@/types';
 
-export interface PlatformConfig {
+// 保留旧接口兼容
+export interface PlatformConfigLegacy {
   id: number;
   tenant_id: string;
   platform_type: string;
@@ -24,8 +25,52 @@ export interface PlatformConfigUpdate {
 }
 
 export const platformApi = {
-  getConfigs: async (): Promise<ApiResponse<PlatformConfig[]>> => {
-    const response = await apiClient.get<ApiResponse<PlatformConfig[]>>('/platform/config');
+  // ===== 新 ISV 模式 API =====
+
+  // 获取可用的 ISV 应用
+  getApps: async (): Promise<PlatformApp[]> => {
+    const response = await apiClient.get<PlatformApp[]>('/platform/apps');
+    return response.data;
+  },
+
+  // 获取租户的所有平台配置（新版，含授权状态）
+  getPlatformConfigs: async (): Promise<PlatformConfigType[]> => {
+    const response = await apiClient.get<PlatformConfigType[]>('/platform/configs');
+    return response.data;
+  },
+
+  // 发起 OAuth 授权（通用）
+  getOAuthUrl: (platformType: EcommercePlatform, redirectUri: string, configId?: number): string => {
+    const params = new URLSearchParams({ redirect_uri: redirectUri });
+    if (configId) params.set('config_id', String(configId));
+    return `/api/v1/platform/${platformType}/auth?${params}`;
+  },
+
+  // 断开平台连接（新版）
+  disconnectPlatform: async (configId: number): Promise<{ success: boolean; message: string }> => {
+    const response = await apiClient.delete<{ success: boolean; message: string }>(
+      `/platform/configs/${configId}`
+    );
+    return response.data;
+  },
+
+  // 通用人工回复
+  sendReply: async (
+    platformType: EcommercePlatform,
+    conversationId: string,
+    content: string,
+  ): Promise<{ success: boolean }> => {
+    const response = await apiClient.post<{ success: boolean }>(
+      `/platform/${platformType}/reply`,
+      { conversation_id: conversationId, content }
+    );
+    return response.data;
+  },
+
+  // ===== 旧 API（向后兼容） =====
+
+  getConfigs: async (): Promise<ApiResponse<PlatformConfigLegacy[]>> => {
+    const response = await apiClient.get<ApiResponse<PlatformConfigLegacy[]>>('/platform/config');
     return response.data;
   },
 
@@ -33,11 +78,11 @@ export const platformApi = {
     platform: string,
     data: PlatformConfigUpdate,
     configId?: number
-  ): Promise<ApiResponse<PlatformConfig>> => {
+  ): Promise<ApiResponse<PlatformConfigLegacy>> => {
     const url = configId
       ? `/platform/config?platform=${platform}&config_id=${configId}`
       : `/platform/config?platform=${platform}`;
-    const response = await apiClient.put<ApiResponse<PlatformConfig>>(url, data);
+    const response = await apiClient.put<ApiResponse<PlatformConfigLegacy>>(url, data);
     return response.data;
   },
 

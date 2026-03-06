@@ -251,3 +251,51 @@ export interface SyncSchedule {
   created_at: string;
   updated_at: string;
 }
+
+// 平台类型
+export type EcommercePlatform = 'pinduoduo' | 'douyin' | 'taobao' | 'jd' | 'kuaishou';
+
+// 授权状态
+export type AuthorizationStatus = 'pending' | 'authorized' | 'expired' | 'revoked';
+
+// ISV 应用
+export interface PlatformApp {
+  platform_type: EcommercePlatform;
+  app_name: string;
+  status: string;
+}
+
+// 平台配置（扩展）
+export interface PlatformConfig {
+  id: number;
+  tenant_id: string;
+  platform_type: EcommercePlatform;
+  app_key: string;
+  shop_id: string | null;
+  shop_name: string | null;
+  is_active: boolean;
+  authorization_status: AuthorizationStatus;
+  auto_reply_threshold: number;
+  human_takeover_message: string | null;
+  expires_at: string | null;
+  token_expires_at: string | null;
+  refresh_expires_at: string | null;
+  last_token_refresh: string | null;
+  scopes: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// 售后记录
+export interface AfterSaleRecord {
+  id: number;
+  platform_config_id: number;
+  platform_aftersale_id: string;
+  order_id: number | null;
+  aftersale_type: 'refund_only' | 'return_refund' | 'exchange';
+  status: string;
+  reason: string | null;
+  refund_amount: number;
+  buyer_id: string | null;
+  created_at: string;
+}
