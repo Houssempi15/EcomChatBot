@@ -34,9 +34,14 @@ class PlatformConfigResponse(BaseModel):
     shop_id: str | None
     shop_name: str | None
     is_active: bool
+    authorization_status: str = "pending"
     auto_reply_threshold: float
     human_takeover_message: str | None
     expires_at: datetime | None
+    token_expires_at: datetime | None
+    refresh_expires_at: datetime | None
+    last_token_refresh: datetime | None
+    scopes: dict | None = None
     created_at: datetime
     updated_at: datetime
 

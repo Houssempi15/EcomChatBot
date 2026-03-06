@@ -3,7 +3,7 @@
 """
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, Index, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, Index, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from models.base import TenantBaseModel
@@ -36,6 +36,33 @@ class PlatformConfig(TenantBaseModel):
 
     # 状态
     is_active: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否已激活(完成授权)")
+
+    # 授权状态（比 is_active 更精细）
+    authorization_status: Mapped[str] = mapped_column(
+        String(16), default="pending",
+        comment="授权状态(pending/authorized/expired/revoked)"
+    )
+
+    # Token 过期管理
+    token_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime, comment="access_token 过期时间"
+    )
+    refresh_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime, comment="refresh_token 过期时间"
+    )
+    last_token_refresh: Mapped[datetime | None] = mapped_column(
+        DateTime, comment="上次 token 刷新时间"
+    )
+
+    # ISV 关联
+    platform_app_id: Mapped[int | None] = mapped_column(
+        Integer, comment="关联 ISV 应用ID"
+    )
+
+    # 扩展配置
+    scopes: Mapped[dict | None] = mapped_column(JSON, comment="授权权限范围")
+    webhook_secret: Mapped[str | None] = mapped_column(String(256), comment="Webhook 验签密钥")
+    extra_config: Mapped[dict | None] = mapped_column(JSON, comment="平台特有配置")
 
     # AI 回复配置
     auto_reply_threshold: Mapped[float] = mapped_column(
