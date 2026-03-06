@@ -118,10 +118,10 @@ celery_app.conf.beat_schedule = {
         "task": "tasks.product_sync_tasks.run_scheduled_syncs",
         "schedule": 300.0,  # 每5分钟检查一次
     },
-    # 每小时刷新即将过期的平台 access_token
+    # 每30分钟检查并刷新即将过期的平台 access_token
     "refresh-platform-tokens": {
         "task": "tasks.platform_tasks.refresh_expiring_tokens",
-        "schedule": 3600.0,
+        "schedule": 1800.0,
     },
 }
 
