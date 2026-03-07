@@ -136,19 +136,8 @@ export interface KnowledgeSearchResult {
   source: string;
 }
 
-// Settings Types
-export type ModelProvider = 'openai' | 'deepseek' | 'zhipuai' | 'qwen' | 'google' | 'meta' | 'siliconflow' | 'private';
-export type ModelType = 'llm' | 'embedding' | 'rerank' | 'image_generation' | 'video_generation';
-
-export interface LLMConfig {
-  provider: ModelProvider;
-  api_key: string;
-  model_name: string;
-  temperature: number;
-  system_prompt: string;
-}
-
-// Dashboard Types
+// Knowledge Types
+export interface KnowledgeDocument {
 export interface DashboardStats {
   today_conversations: number;
   today_conversations_change: number;
@@ -436,5 +425,207 @@ export interface ReviewAssetRequest {
 export interface BatchUploadAssetsRequest {
   asset_ids: number[];
   platform_config_id: number;
+}
+
+// ===== 智能触达 =====
+
+// 客户分群
+export type SegmentType = 'manual' | 'dynamic';
+
+export interface CustomerSegment {
+  id: number;
+  tenant_id: string;
+  name: string;
+  description: string | null;
+  segment_type: SegmentType;
+  filter_rules: Record<string, unknown> | null;
+  member_count: number;
+  last_refreshed_at: string | null;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SegmentMember {
+  id: number;
+  user_id: number;
+  nickname: string | null;
+  vip_level: number;
+  total_conversations: number;
+  added_at: string | null;
+}
+
+// 外呼活动
+export type CampaignType = 'manual' | 'auto_rule' | 'follow_up' | 'post_purchase';
+export type CampaignStatus = 'draft' | 'scheduled' | 'running' | 'paused' | 'completed' | 'failed';
+export type ContentStrategy = 'template' | 'ai_generated';
+export type OutreachTaskStatus = 'pending' | 'generating' | 'sending' | 'sent' | 'delivered' | 'failed' | 'cancelled' | 'converted';
+
+export interface OutreachCampaign {
+  id: number;
+  tenant_id: string;
+  name: string;
+  campaign_type: CampaignType;
+  segment_id: number | null;
+  rule_id: number | null;
+  content_strategy: ContentStrategy;
+  content_template: string | null;
+  ai_prompt: string | null;
+  channel: string | null;
+  platform_type: string | null;
+  platform_config_id: number | null;
+  scheduled_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  status: CampaignStatus;
+  total_targets: number;
+  sent_count: number;
+  delivered_count: number;
+  failed_count: number;
+  clicked_count: number;
+  converted_count: number;
+  max_per_user_per_day: number;
+  cooldown_hours: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CampaignStats {
+  total_targets: number;
+  sent_count: number;
+  delivered_count: number;
+  failed_count: number;
+  clicked_count: number;
+  converted_count: number;
+  send_rate: number;
+  delivery_rate: number;
+  conversion_rate: number;
+}
+
+export interface OutreachTask {
+  id: number;
+  tenant_id: string;
+  campaign_id: number | null;
+  rule_id: number | null;
+  user_id: number;
+  content: string | null;
+  status: OutreachTaskStatus;
+  scheduled_at: string | null;
+  sent_at: string | null;
+  delivered_at: string | null;
+  converted_at: string | null;
+  error_message: string | null;
+  follow_up_plan_id: number | null;
+  follow_up_sequence: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// 自动规则
+export type RuleType = 'cart_abandoned' | 'new_user_inactive' | 'post_purchase' | 'churn_risk' | 'follow_up';
+
+export interface OutreachRule {
+  id: number;
+  tenant_id: string;
+  name: string;
+  rule_type: RuleType;
+  trigger_conditions: Record<string, unknown> | null;
+  content_strategy: ContentStrategy;
+  content_template: string | null;
+  ai_prompt: string | null;
+  channel: string | null;
+  platform_type: string | null;
+  platform_config_id: number | null;
+  is_active: number;
+  max_triggers_per_user: number;
+  cooldown_hours: number;
+  total_triggered: number;
+  total_converted: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// 定时跟进
+export type FollowUpReason = 'churn_risk' | 'high_potential' | 'post_purchase' | 'reactivation';
+export type FollowUpStatus = 'active' | 'paused' | 'completed' | 'cancelled' | 'converted';
+
+export interface FollowUpPlan {
+  id: number;
+  tenant_id: string;
+  user_id: number;
+  rule_id: number | null;
+  reason: FollowUpReason;
+  ai_context: Record<string, unknown> | null;
+  total_steps: number;
+  current_step: number;
+  next_follow_up_at: string | null;
+  interval_days: number;
+  status: FollowUpStatus;
+  user_responded: number;
+  converted: number;
+  converted_order_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FollowUpDashboard {
+  active_plans: number;
+  completed_plans: number;
+  converted_plans: number;
+  total_follow_ups_sent: number;
+  conversion_rate: number;
+}
+
+// 增购推荐
+export type RecommendRuleType = 'cross_sell' | 'upsell' | 'accessory' | 'consumable' | 'replenish';
+export type RecommendTriggerType = 'in_conversation' | 'post_purchase' | 'manual';
+export type RecommendStrategy = 'manual' | 'ai_similar' | 'ai_complementary' | 'popular_in_category';
+
+export interface RecommendationRule {
+  id: number;
+  tenant_id: string;
+  name: string;
+  rule_type: RecommendRuleType;
+  trigger_type: RecommendTriggerType;
+  trigger_product_ids: number[] | null;
+  trigger_category: string | null;
+  trigger_conditions: Record<string, unknown> | null;
+  recommend_product_ids: number[] | null;
+  recommend_category: string | null;
+  recommend_strategy: RecommendStrategy;
+  max_recommendations: number;
+  ai_prompt: string | null;
+  is_active: number;
+  priority: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RecommendationLog {
+  id: number;
+  tenant_id: string;
+  user_id: number;
+  rule_id: number | null;
+  trigger_type: string;
+  trigger_product_id: number | null;
+  trigger_order_id: number | null;
+  conversation_id: string | null;
+  recommended_product_ids: number[] | null;
+  recommendation_text: string | null;
+  displayed: number;
+  clicked_product_id: number | null;
+  converted: number;
+  converted_order_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RecommendationStats {
+  total_recommendations: number;
+  total_displayed: number;
+  total_clicked: number;
+  total_converted: number;
+  click_rate: number;
+  conversion_rate: number;
 }
 

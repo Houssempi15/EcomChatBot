@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Row, Col, Card, Typography, message, Alert, Form, Input, Button, Modal, Tabs } from 'antd';
 import Skeleton from '@/components/ui/Loading/Skeleton';
-import { SettingsMenu, ModelConfigForm, SubscriptionPanel } from '@/components/settings';
+import { SettingsMenu, SubscriptionPanel } from '@/components/settings';
 import { CopyOutlined, KeyOutlined, ExclamationCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import { useAuthStore } from '@/store';
 import { platformApi, PlatformConfig } from '@/lib/api/platform';
@@ -18,7 +18,7 @@ const { Title, Text } = Typography;
 
 export default function SettingsPage() {
   const searchParams = useSearchParams();
-  const [selectedMenu, setSelectedMenu] = useState('model');
+  const [selectedMenu, setSelectedMenu] = useState('api');
   const { tenantId } = useAuthStore();
   const [planName, setPlanName] = useState<string | null>(null);
   const [apiKeyPrefix, setApiKeyPrefix] = useState<string | null>(null);
@@ -100,8 +100,6 @@ export default function SettingsPage() {
 
   const renderContent = () => {
     switch (selectedMenu) {
-      case 'model':
-        return <ModelConfigForm />;
       case 'api':
         return (
           <>

@@ -16,7 +16,6 @@ import {
   type VideoProviderCapability,
 } from '@/lib/api/content';
 import { productApi } from '@/lib/api/product';
-import { settingsApi, type ModelConfig } from '@/lib/api/settings';
 import { usePlatformUpload } from '@/hooks/usePlatformUpload';
 import Skeleton from '@/components/ui/Loading/Skeleton';
 import type { Product, GenerationTask, GeneratedAsset, SceneType } from '@/types';
@@ -33,7 +32,6 @@ export default function AdvancedModeVideo() {
   const [prompt, setPrompt] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<number | undefined>();
   const [selectedPrompt, setSelectedPrompt] = useState<number | undefined>();
-  const [selectedModel, setSelectedModel] = useState<number | undefined>();
   const [imageUrl, setImageUrl] = useState('');
   const [duration, setDuration] = useState(5);
   const [generating, setGenerating] = useState(false);
@@ -46,36 +44,25 @@ export default function AdvancedModeVideo() {
   const [assets, setAssets] = useState<GeneratedAsset[]>([]);
   const [prompts, setPrompts] = useState<ProductPrompt[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [videoModels, setVideoModels] = useState<ModelConfig[]>([]);
   const [loading, setLoading] = useState(false);
   const [capabilities, setCapabilities] = useState<Record<string, VideoProviderCapability>>({});
 
-  const currentCaps = useMemo(() => {
-    if (!selectedModel) return null;
-    const model = videoModels.find(m => m.id === selectedModel);
-    if (!model) return null;
-    return capabilities[model.provider] || null;
-  }, [selectedModel, videoModels, capabilities]);
-
   const durationOptions = useMemo(() => {
-    if (currentCaps) return currentCaps.duration_options.map(o => ({ value: o.value, label: o.label }));
     return DEFAULT_DURATION_OPTIONS;
-  }, [currentCaps]);
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [tasksResp, assetsResp, productsResp, modelsResp, capsResp] = await Promise.all([
+      const [tasksResp, assetsResp, productsResp, capsResp] = await Promise.all([
         contentApi.listTasks({ task_type: 'video', size: 10 }),
         contentApi.listAssets({ asset_type: 'video', size: 20 }),
         productApi.listProducts({ status: 'active', size: 100 }),
-        settingsApi.getModelConfigsByType('video_generation'),
         contentApi.getProviderCapabilities<Record<string, VideoProviderCapability>>('video'),
       ]);
       if (tasksResp.success && tasksResp.data) setTasks(tasksResp.data.items);
       if (assetsResp.success && assetsResp.data) setAssets(assetsResp.data.items);
       if (productsResp.success && productsResp.data) setProducts(productsResp.data.items);
-      if (modelsResp.success && modelsResp.data) setVideoModels(modelsResp.data);
       if (capsResp.success && capsResp.data) setCapabilities(capsResp.data);
     } catch {
       // ignore
@@ -104,17 +91,6 @@ export default function AdvancedModeVideo() {
     }
   }, [selectedProduct]);
 
-  const handleModelChange = (val: number | undefined) => {
-    setSelectedModel(val);
-    if (val) {
-      const model = videoModels.find(m => m.id === val);
-      if (model) {
-        const caps = capabilities[model.provider];
-        if (caps) setDuration(caps.default_duration);
-      }
-    }
-  };
-
   const { uploadAsset } = usePlatformUpload(loadData);
 
   const handleGenerate = async () => {
@@ -128,7 +104,6 @@ export default function AdvancedModeVideo() {
         prompt: prompt.trim(),
         product_id: selectedProduct,
         prompt_id: selectedPrompt,
-        model_config_id: selectedModel,
         params,
         scene_type: sceneType,
         target_platform: targetPlatform,
@@ -203,12 +178,6 @@ export default function AdvancedModeVideo() {
             <div>
               <Text strong>参考图片URL（可选，图生视频）</Text>
               <Input placeholder="输入图片URL" value={imageUrl} onChange={e => setImageUrl(e.target.value)} style={{ marginTop: 8 }} />
-            </div>
-            <div>
-              <Text strong>视频生成模型（可选）</Text>
-              <Select placeholder="选择视频生成模型（不选则使用默认）" allowClear style={{ width: '100%', marginTop: 8 }}
-                value={selectedModel} onChange={handleModelChange}
-                options={videoModels.map(m => ({ value: m.id, label: `${m.provider} / ${m.model_name}${m.is_default ? ' (默认)' : ''}` }))} />
             </div>
             <div>
               <Text strong>视频时长</Text>

@@ -10,7 +10,6 @@ import {
   EnhancedRetrievalTest,
 } from '@/components/knowledge';
 import { knowledgeApi, KnowledgeItem, KnowledgeSettings } from '@/lib/api/knowledge';
-import { settingsApi, ModelConfig } from '@/lib/api/settings';
 import { KnowledgeDocument, KnowledgeSearchResult } from '@/types';
 
 const { Title } = Typography;
@@ -53,7 +52,6 @@ export default function KnowledgePage() {
 
   // Knowledge settings
   const [knowledgeSettings, setKnowledgeSettings] = useState<KnowledgeSettings | null>(null);
-  const [modelConfigs, setModelConfigs] = useState<ModelConfig[]>([]);
   const [savingSettings, setSavingSettings] = useState(false);
 
   // Load stats from dedicated endpoint
@@ -152,15 +150,9 @@ export default function KnowledgePage() {
   // Load settings and model configs
   const loadSettings = useCallback(async () => {
     try {
-      const [settingsResp, modelsResp] = await Promise.all([
-        knowledgeApi.getSettings(),
-        settingsApi.getModelConfigs(),
-      ]);
+      const settingsResp = await knowledgeApi.getSettings();
       if (settingsResp.success && settingsResp.data) {
         setKnowledgeSettings(settingsResp.data);
-      }
-      if (modelsResp.success && modelsResp.data) {
-        setModelConfigs(modelsResp.data);
       }
     } catch (err) {
       console.error('Failed to load knowledge settings:', err);
@@ -277,9 +269,6 @@ export default function KnowledgePage() {
     return matchesStatus;
   });
 
-  const embeddingModels = modelConfigs.filter((m) => m.model_type === 'embedding');
-  const rerankModels = modelConfigs.filter((m) => m.model_type === 'rerank');
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -296,42 +285,14 @@ export default function KnowledgePage() {
 
       {/* Knowledge Settings */}
       <Card title="知识库设置" className="mb-4">
+        <Alert
+          message="模型配置已迁移至环境变量"
+          description="嵌入模型和重排模型现在通过环境变量配置，无需在界面中选择。"
+          type="info"
+          showIcon
+          className="mb-4"
+        />
         <Form layout="inline">
-          <Form.Item label="嵌入模型">
-            <Select
-              style={{ width: 280 }}
-              placeholder="请选择嵌入模型"
-              value={knowledgeSettings?.embedding_model_id ?? undefined}
-              disabled={knowledgeSettings?.has_indexed_documents}
-              allowClear
-              options={embeddingModels.map((m) => ({
-                value: m.id,
-                label: `${m.model_name} (${m.provider})`,
-              }))}
-              onChange={(val) =>
-                setKnowledgeSettings((prev) =>
-                  prev ? { ...prev, embedding_model_id: val ?? null } : null
-                )
-              }
-            />
-          </Form.Item>
-          <Form.Item label="重排模型（检索用）">
-            <Select
-              style={{ width: 280 }}
-              placeholder="不使用重排序"
-              value={knowledgeSettings?.rerank_model_id ?? undefined}
-              allowClear
-              options={rerankModels.map((m) => ({
-                value: m.id,
-                label: `${m.model_name} (${m.provider})`,
-              }))}
-              onChange={(val) =>
-                setKnowledgeSettings((prev) =>
-                  prev ? { ...prev, rerank_model_id: val ?? null } : null
-                )
-              }
-            />
-          </Form.Item>
           <Form.Item>
             <Button type="primary" loading={savingSettings} onClick={handleSaveSettings}>
               保存设置
@@ -417,11 +378,7 @@ export default function KnowledgePage() {
       {/* Enhanced Retrieval & RAG Test */}
       <EnhancedRetrievalTest
         onSearch={handleSearch}
-        rerankModels={rerankModels.map((m) => ({
-          id: m.id,
-          model_name: m.model_name,
-          provider: m.provider,
-        }))}
+        rerankModels={[]}
       />
 
       {/* Upload Modal */}

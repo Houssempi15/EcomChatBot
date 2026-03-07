@@ -2,7 +2,6 @@
 
 import { Card, Menu, Typography } from 'antd';
 import {
-  RobotOutlined,
   KeyOutlined,
   BankOutlined,
   BellOutlined,
@@ -18,11 +17,6 @@ interface SettingsMenuProps {
 }
 
 const menuItems = [
-  {
-    key: 'model',
-    icon: <RobotOutlined />,
-    label: '模型配置',
-  },
   {
     key: 'api',
     icon: <KeyOutlined />,

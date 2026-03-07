@@ -16,7 +16,6 @@ import {
   type ImageProviderCapability,
 } from '@/lib/api/content';
 import { productApi } from '@/lib/api/product';
-import { settingsApi, type ModelConfig } from '@/lib/api/settings';
 import { usePlatformUpload } from '@/hooks/usePlatformUpload';
 import Skeleton from '@/components/ui/Loading/Skeleton';
 import type { Product, GenerationTask, GeneratedAsset, SceneType } from '@/types';
@@ -28,7 +27,6 @@ export default function AdvancedModePoster() {
   const [prompt, setPrompt] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<number | undefined>();
   const [selectedPrompt, setSelectedPrompt] = useState<number | undefined>();
-  const [selectedModel, setSelectedModel] = useState<number | undefined>();
   const [imageSize, setImageSize] = useState('1024x1024');
   const [imageCount, setImageCount] = useState(1);
   const [generating, setGenerating] = useState(false);
@@ -41,28 +39,18 @@ export default function AdvancedModePoster() {
   const [assets, setAssets] = useState<GeneratedAsset[]>([]);
   const [prompts, setPrompts] = useState<ProductPrompt[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [imageModels, setImageModels] = useState<ModelConfig[]>([]);
   const [loading, setLoading] = useState(false);
   const [capabilities, setCapabilities] = useState<Record<string, ImageProviderCapability>>({});
 
-  const currentCaps = useMemo(() => {
-    if (!selectedModel) return null;
-    const model = imageModels.find(m => m.id === selectedModel);
-    if (!model) return null;
-    return capabilities[model.provider] || null;
-  }, [selectedModel, imageModels, capabilities]);
-
   const sizeOptions = useMemo(() => {
-    if (currentCaps) return currentCaps.size_options.map(o => ({ value: o.value, label: o.label }));
     return [
       { value: '1024x1024', label: '1024x1024 (正方形)' },
       { value: '1024x1792', label: '1024x1792 (竖版)' },
       { value: '1792x1024', label: '1792x1024 (横版)' },
     ];
-  }, [currentCaps]);
+  }, []);
 
-  const supportsBatch = currentCaps ? currentCaps.supports_batch : true;
-  const maxBatch = currentCaps ? currentCaps.max_batch : 4;
+  const maxBatch = 4;
   const countOptions = useMemo(() => {
     return Array.from({ length: maxBatch }, (_, i) => ({
       value: i + 1,
@@ -73,17 +61,15 @@ export default function AdvancedModePoster() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [tasksResp, assetsResp, productsResp, modelsResp, capsResp] = await Promise.all([
+      const [tasksResp, assetsResp, productsResp, capsResp] = await Promise.all([
         contentApi.listTasks({ task_type: 'poster', size: 10 }),
         contentApi.listAssets({ asset_type: 'image', size: 20 }),
         productApi.listProducts({ status: 'active', size: 100 }),
-        settingsApi.getModelConfigsByType('image_generation'),
         contentApi.getProviderCapabilities<Record<string, ImageProviderCapability>>('poster'),
       ]);
       if (tasksResp.success && tasksResp.data) setTasks(tasksResp.data.items);
       if (assetsResp.success && assetsResp.data) setAssets(assetsResp.data.items);
       if (productsResp.success && productsResp.data) setProducts(productsResp.data.items);
-      if (modelsResp.success && modelsResp.data) setImageModels(modelsResp.data);
       if (capsResp.success && capsResp.data) setCapabilities(capsResp.data);
     } catch {
       // ignore
@@ -112,34 +98,18 @@ export default function AdvancedModePoster() {
     }
   }, [selectedProduct]);
 
-  const handleModelChange = (val: number | undefined) => {
-    setSelectedModel(val);
-    if (val) {
-      const model = imageModels.find(m => m.id === val);
-      if (model) {
-        const caps = capabilities[model.provider];
-        if (caps) {
-          setImageSize(caps.default_size);
-          if (!caps.supports_batch) setImageCount(1);
-        }
-      }
-    }
-  };
-
   const { uploadAsset } = usePlatformUpload(loadData);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) { message.warning('请输入生成提示词'); return; }
     setGenerating(true);
     try {
-      const params: Record<string, unknown> = { size: imageSize };
-      if (supportsBatch) params.n = imageCount;
+      const params: Record<string, unknown> = { size: imageSize, n: imageCount };
       const resp = await contentApi.createGeneration({
         task_type: 'poster',
         prompt: prompt.trim(),
         product_id: selectedProduct,
         prompt_id: selectedPrompt,
-        model_config_id: selectedModel,
         params,
         scene_type: sceneType,
         target_platform: targetPlatform,
@@ -219,23 +189,15 @@ export default function AdvancedModePoster() {
                   options={prompts.map(p => ({ value: p.id, label: p.name }))} />
               </div>
             )}
-            <div>
-              <Text strong>图像生成模型（可选）</Text>
-              <Select placeholder="选择图像生成模型（不选则使用默认）" allowClear style={{ width: '100%', marginTop: 8 }}
-                value={selectedModel} onChange={handleModelChange}
-                options={imageModels.map(m => ({ value: m.id, label: `${m.provider} / ${m.model_name}${m.is_default ? ' (默认)' : ''}` }))} />
-            </div>
             <Row gutter={12}>
-              <Col span={supportsBatch ? 14 : 24}>
+              <Col span={14}>
                 <Text strong>图片尺寸</Text>
                 <Select style={{ width: '100%', marginTop: 8 }} value={imageSize} onChange={setImageSize} options={sizeOptions} />
               </Col>
-              {supportsBatch && (
-                <Col span={10}>
-                  <Text strong>生成数量</Text>
-                  <Select style={{ width: '100%', marginTop: 8 }} value={imageCount} onChange={setImageCount} options={countOptions} />
-                </Col>
-              )}
+              <Col span={10}>
+                <Text strong>生成数量</Text>
+                <Select style={{ width: '100%', marginTop: 8 }} value={imageCount} onChange={setImageCount} options={countOptions} />
+              </Col>
             </Row>
             <div>
               <Text strong>生成提示词</Text>

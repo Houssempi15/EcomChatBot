@@ -7,7 +7,6 @@ import {
 } from 'antd';
 import { SearchOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { KnowledgeSearchResult } from '@/types';
-import { settingsApi, ModelConfig } from '@/lib/api/settings';
 import Skeleton from '@/components/ui/Loading/Skeleton';
 import apiClient from '@/lib/api/client';
 import { ApiResponse } from '@/types';
@@ -61,26 +60,6 @@ export default function EnhancedRetrievalTest({ onSearch, rerankModels }: Enhanc
   const [ragQuery, setRagQuery] = useState('');
   const [ragResult, setRagResult] = useState<RAGTestResult | null>(null);
   const [ragLoading, setRagLoading] = useState(false);
-  const [ragModelConfigId, setRagModelConfigId] = useState<number | undefined>(undefined);
-  const [llmModels, setLlmModels] = useState<ModelConfig[]>([]);
-
-  useEffect(() => {
-    loadLLMModels();
-  }, []);
-
-  const loadLLMModels = async () => {
-    try {
-      const res = await settingsApi.getModelConfigs();
-      if (res.success && res.data) {
-        const models = res.data.filter((m) => m.model_type === 'llm' && m.is_active);
-        setLlmModels(models);
-        const defaultModel = models.find((m) => m.is_default) || models[0];
-        if (defaultModel) setRagModelConfigId(defaultModel.id);
-      }
-    } catch {
-      // ignore
-    }
-  };
 
   const handleSearch = async () => {
     if (!query.trim()) return;
@@ -105,7 +84,6 @@ export default function EnhancedRetrievalTest({ onSearch, rerankModels }: Enhanc
         query: ragQuery,
         top_k: topK,
         use_rerank: !!selectedRerankModelId,
-        model_config_id: ragModelConfigId || undefined,
       });
       if (response.data.success && response.data.data) {
         setRagResult(response.data.data);
@@ -234,19 +212,6 @@ export default function EnhancedRetrievalTest({ onSearch, rerankModels }: Enhanc
           </div>
 
           <div className="mb-4 flex gap-4 flex-wrap items-center">
-            <div className="flex items-center gap-2">
-              <Text className="text-xs text-gray-500">LLM 模型:</Text>
-              <Select
-                style={{ minWidth: 220 }}
-                value={ragModelConfigId}
-                onChange={setRagModelConfigId}
-                placeholder="选择模型"
-                options={llmModels.map((m) => ({
-                  value: m.id,
-                  label: `${m.model_name} (${m.provider})`,
-                }))}
-              />
-            </div>
             <div className="flex items-center gap-2">
               <Text className="text-xs text-gray-500">Top-K:</Text>
               <Slider min={1} max={20} value={topK} onChange={setTopK} style={{ width: 120 }} />
