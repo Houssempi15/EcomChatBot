@@ -53,32 +53,9 @@ class Settings(BaseSettings):
     api_key_prefix: str = "eck_"
     api_key_length: int = 32
 
-    # OpenAI
-    openai_api_key: str | None = None
-    openai_model: str = "gpt-4o"
-    openai_temperature: float = 0.7
-    openai_max_tokens: int = 2000
-    openai_base_url: str | None = None
-
     # Milvus
     milvus_uri: str = ""
     milvus_token: str = ""
-
-    # LLM 配置
-    openai_api_key: str = ""
-    openai_api_base: str = "https://api.openai.com/v1"
-    default_llm_model: str = "gpt-3.5-turbo"
-    max_tokens: int = 2000
-    temperature: float = 0.7
-
-    # Azure OpenAI（可选）
-    azure_openai_api_key: str = ""
-    azure_openai_endpoint: str = ""
-    azure_openai_api_version: str = "2024-02-01"
-
-    # Embedding
-    embedding_model: str = "text-embedding-3-small"
-    embedding_dimension: int = 1536
 
     # ============ 存储配置 ============
     storage_backend: str = "tos"  # 固定使用 tos
