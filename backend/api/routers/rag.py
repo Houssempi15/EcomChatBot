@@ -207,13 +207,7 @@ async def rag_end_to_end_test(
 
     # 3. LLM generation phase
     generation_start = time.monotonic()
-    mc_svc = ModelConfigService(db, tenant_id)
-    if request.model_config_id:
-        mc = await mc_svc.get_model_config(request.model_config_id)
-    else:
-        mc = await mc_svc.get_default_model(use_case="dialogue")
-
-    llm_service = LLMService(tenant_id, model_config=mc)
+    llm_service = LLMService(tenant_id)
     prompt_service = PromptService()
     system_prompt = prompt_service.get_system_prompt()
 
