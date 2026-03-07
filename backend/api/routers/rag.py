@@ -47,18 +47,6 @@ class BatchIndexRequest(BaseModel):
     knowledge_ids: list[str]
 
 
-async def _load_embedding_config(db, tenant_id):
-    """从 KnowledgeSettings 加载 embedding 模型配置"""
-    try:
-        ks = await KnowledgeService(db, tenant_id).get_settings()
-        if ks and ks.embedding_model_id:
-            result = await db.execute(select(ModelConfig).where(ModelConfig.id == ks.embedding_model_id))
-            return result.scalar_one_or_none()
-    except Exception:
-        pass
-    return None
-
-
 @router.post("/retrieve", response_model=ApiResponse[list[dict]])
 async def rag_retrieve(
     request: RAGQueryRequest,
@@ -72,7 +60,7 @@ async def rag_retrieve(
 
     ⚠️ 会检查API调用配额
     """
-    service = RAGService(db, tenant_id, embedding_model_config=await _load_embedding_config(db, tenant_id))
+    service = RAGService(db, tenant_id)
 
     results = await service.retrieve(
         query=request.query,
@@ -96,7 +84,7 @@ async def rag_generate(
 
     ⚠️ 会检查API调用配额
     """
-    service = RAGService(db, tenant_id, embedding_model_config=await _load_embedding_config(db, tenant_id))
+    service = RAGService(db, tenant_id)
 
     result = await service.retrieve_and_generate(
         query=request.query,
@@ -119,7 +107,7 @@ async def index_knowledge(
 
     ⚠️ 会检查存储空间配额
     """
-    service = RAGService(db, tenant_id, embedding_model_config=await _load_embedding_config(db, tenant_id))
+    service = RAGService(db, tenant_id)
 
     result = await service.index_knowledge(request.knowledge_id)
 
@@ -139,7 +127,7 @@ async def batch_index_knowledge(
 
     ⚠️ 会检查存储空间配额
     """
-    service = RAGService(db, tenant_id, embedding_model_config=await _load_embedding_config(db, tenant_id))
+    service = RAGService(db, tenant_id)
 
     result = await service.index_batch_knowledge(request.knowledge_ids)
 
@@ -156,7 +144,7 @@ async def get_rag_stats(
     
     包括向量库统计、Embedding 模型信息等
     """
-    service = RAGService(db, tenant_id, embedding_model_config=await _load_embedding_config(db, tenant_id))
+    service = RAGService(db, tenant_id)
 
     stats = service.get_stats()
 
@@ -188,10 +176,7 @@ async def rag_end_to_end_test(
 
     # 1. Retrieval phase
     retrieval_start = time.monotonic()
-    rag_service = RAGService(
-        db, tenant_id,
-        embedding_model_config=await _load_embedding_config(db, tenant_id),
-    )
+    rag_service = RAGService(db, tenant_id)
     retrieval_results = await rag_service.retrieve(
         query=request.query,
         top_k=request.top_k,

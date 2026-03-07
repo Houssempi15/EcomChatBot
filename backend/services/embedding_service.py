@@ -116,54 +116,66 @@ PROVIDER_DEFAULT_BASE: dict[str, str] = {
 class EmbeddingService:
     """Embedding 服务"""
 
-    def __init__(self, tenant_id: str, model_config=None):
+    def __init__(self, tenant_id: str):
         """
-        初始化 Embedding 服务
+        初始化 Embedding 服务，从环境变量读取配置
 
         Args:
             tenant_id: 租户 ID
-            model_config: 可选的 ModelConfig ORM 对象；若提供则优先使用，否则回退到全局配置
         """
         self.tenant_id = tenant_id
-        self._model_config = model_config
+        self.provider = settings.embedding_provider
+        self.model = settings.embedding_model
+        self.api_key = settings.volcengine_api_key
+        self.api_base = settings.volcengine_api_base
+        self.dimension = settings.embedding_dimension
 
-        if model_config and model_config.provider == "zhipuai":
+        # 验证必需配置
+        if not self.api_key:
+            raise ValueError(f"API key not configured for provider: {self.provider}")
+
+        # 根据 provider 初始化对应的 embedding 实例
+        if self.provider == "volcengine":
+            self.embeddings = self._init_volcengine_embeddings()
+        elif self.provider == "zhipuai":
             # ZhipuAI 不兼容 LangChain 的 tiktoken 分词，直接用 httpx 调用
             self.embeddings = _ZhipuAIEmbeddings(
-                api_key=model_config.api_key,
-                model=model_config.model_name,
+                api_key=self.api_key,
+                model=self.model,
             )
-        elif model_config and model_config.provider == "qwen":
+        elif self.provider == "qwen":
             # Qwen: v3 支持 OpenAI 兼容格式，v2 及以下需要 DashScope 原生 API
-            if model_config.model_name in QWEN_OPENAI_COMPATIBLE_MODELS:
-                base = model_config.api_base or PROVIDER_DEFAULT_BASE["qwen"]
+            if self.model in QWEN_OPENAI_COMPATIBLE_MODELS:
                 self.embeddings = OpenAIEmbeddings(
-                    model=model_config.model_name,
-                    openai_api_key=model_config.api_key,
-                    openai_api_base=base,
+                    model=self.model,
+                    openai_api_key=self.api_key,
+                    openai_api_base=self.api_base or PROVIDER_DEFAULT_BASE["qwen"],
                 )
             else:
                 # text-embedding-v2 等需要 DashScope 原生 API
                 self.embeddings = _QwenEmbeddings(
-                    api_key=model_config.api_key,
-                    model=model_config.model_name,
+                    api_key=self.api_key,
+                    model=self.model,
                 )
-        elif model_config and model_config.provider in OPENAI_COMPATIBLE:
-            base = model_config.api_base or PROVIDER_DEFAULT_BASE.get(
-                model_config.provider, "https://api.openai.com/v1"
+        elif self.provider in OPENAI_COMPATIBLE:
+            base = self.api_base or PROVIDER_DEFAULT_BASE.get(
+                self.provider, "https://api.openai.com/v1"
             )
             self.embeddings = OpenAIEmbeddings(
-                model=model_config.model_name,
-                openai_api_key=model_config.api_key,
+                model=self.model,
+                openai_api_key=self.api_key,
                 openai_api_base=base,
             )
         else:
-            # 回退到全局配置（兼容原有行为）
-            self.embeddings = OpenAIEmbeddings(
-                model=settings.embedding_model,
-                openai_api_key=settings.openai_api_key,
-                openai_api_base=settings.openai_api_base,
-            )
+            raise ValueError(f"Unsupported embedding provider: {self.provider}")
+
+    def _init_volcengine_embeddings(self):
+        """初始化火山引擎 embedding（兼容 OpenAI 接口）"""
+        return OpenAIEmbeddings(
+            model=self.model,
+            openai_api_key=self.api_key,
+            openai_api_base=self.api_base,
+        )
 
     async def embed_text(self, text: str) -> list[float]:
         """
@@ -220,15 +232,11 @@ class EmbeddingService:
         Returns:
             向量维度
         """
-        if self._model_config:
-            return EMBEDDING_DIMENSIONS.get(self._model_config.model_name, 1536)
-        return settings.embedding_dimension
+        return EMBEDDING_DIMENSIONS.get(self.model, self.dimension)
 
     def get_model_name(self) -> str:
         """获取当前使用的模型名称"""
-        if self._model_config:
-            return self._model_config.model_name
-        return settings.embedding_model
+        return self.model
 
     def get_model_info(self) -> dict[str, Any]:
         """
@@ -237,16 +245,9 @@ class EmbeddingService:
         Returns:
             模型信息
         """
-        if self._model_config:
-            return {
-                "model": self._model_config.model_name,
-                "dimension": self.get_dimension(),
-                "provider": self._model_config.provider,
-                "tenant_id": self.tenant_id,
-            }
         return {
-            "model": settings.embedding_model,
-            "dimension": settings.embedding_dimension,
-            "provider": "openai",
+            "model": self.model,
+            "dimension": self.get_dimension(),
+            "provider": self.provider,
             "tenant_id": self.tenant_id,
         }

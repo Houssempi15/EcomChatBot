@@ -249,26 +249,7 @@ async def rag_query(
     knowledge_svc = KnowledgeService(db, tenant_id)
     ks = await knowledge_svc.get_settings()
 
-    # 加载 embedding model config（优先使用租户配置）
-    embedding_config = None
-    if ks.embedding_model_id:
-        mc_stmt = select(ModelConfig).where(ModelConfig.id == ks.embedding_model_id)
-        mc_result = await db.execute(mc_stmt)
-        embedding_config = mc_result.scalar_one_or_none()
-
-    # 加载 rerank model config（仅在请求时使用）
-    rerank_config = None
-    if query_data.use_rerank and ks.rerank_model_id:
-        mc_stmt = select(ModelConfig).where(ModelConfig.id == ks.rerank_model_id)
-        mc_result = await db.execute(mc_stmt)
-        rerank_config = mc_result.scalar_one_or_none()
-
-    service = RAGService(
-        db,
-        tenant_id,
-        embedding_model_config=embedding_config,
-        rerank_model_config=rerank_config,
-    )
+    service = RAGService(db, tenant_id)
     results = await service.retrieve(
         query=query_data.query,
         top_k=query_data.top_k,

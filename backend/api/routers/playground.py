@@ -84,13 +84,8 @@ async def playground_chat(
     if request.use_rag:
         ks = KnowledgeService(db, tenant_id)
         ks_settings = await ks.get_settings()
-        if ks_settings.embedding_model_id:
-            mc_result = await db.execute(sa_select(ModelConfig).where(ModelConfig.id == ks_settings.embedding_model_id))
-            embedding_config = mc_result.scalar_one_or_none()
-            rag = RAGService(db, tenant_id, embedding_model_config=embedding_config)
-            chunks = await rag.retrieve(query=request.message, top_k=request.rag_top_k)
-        else:
-            chunks = []
+        rag = RAGService(db, tenant_id)
+        chunks = await rag.retrieve(query=request.message, top_k=request.rag_top_k)
 
         if chunks:
             context = "\n\n".join(f"[{c['title']}]\n{c['content']}" for c in chunks)
@@ -148,13 +143,8 @@ async def playground_chat_stream(
             if request.use_rag:
                 ks = KnowledgeService(db, tenant_id)
                 ks_settings = await ks.get_settings()
-                if ks_settings.embedding_model_id:
-                    mc_result = await db.execute(sa_select(ModelConfig).where(ModelConfig.id == ks_settings.embedding_model_id))
-                    embedding_config = mc_result.scalar_one_or_none()
-                    rag = RAGService(db, tenant_id, embedding_model_config=embedding_config)
-                    chunks = await rag.retrieve(query=request.message, top_k=request.rag_top_k)
-                else:
-                    chunks = []
+                rag = RAGService(db, tenant_id)
+                chunks = await rag.retrieve(query=request.message, top_k=request.rag_top_k)
 
                 if chunks:
                     rag_sources = [

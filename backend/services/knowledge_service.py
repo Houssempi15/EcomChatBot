@@ -33,12 +33,8 @@ async def _embed_in_background(knowledge_id: str, tenant_id: str, embedding_mode
 
     try:
         async with AsyncSessionLocal() as db:
-            stmt = select(ModelConfig).where(ModelConfig.id == embedding_model_id)
-            result = await db.execute(stmt)
-            model_config = result.scalar_one_or_none()
-            if model_config:
-                rag = RAGService(db, tenant_id, embedding_model_config=model_config)
-                await rag.index_knowledge(knowledge_id)
+            rag = RAGService(db, tenant_id)
+            await rag.index_knowledge(knowledge_id)
             await db.execute(
                 sa_update(KnowledgeBase)
                 .where(KnowledgeBase.knowledge_id == knowledge_id)
@@ -123,12 +119,8 @@ class KnowledgeService:
         from models.model_config import ModelConfig
         from services.rag_service import RAGService
 
-        model_stmt = select(ModelConfig).where(ModelConfig.id == embedding_model_id)
-        result = await self.db.execute(model_stmt)
-        model_config = result.scalar_one_or_none()
-        if model_config:
-            rag = RAGService(self.db, self.tenant_id, embedding_model_config=model_config)
-            await rag.index_knowledge(knowledge.knowledge_id)
+        rag = RAGService(self.db, self.tenant_id)
+        await rag.index_knowledge(knowledge.knowledge_id)
 
     async def get_settings(self) -> KnowledgeSettings:
         """获取或自动创建租户知识库设置"""
@@ -309,15 +301,10 @@ class KnowledgeService:
             from models.model_config import ModelConfig
             from services.rag_service import RAGService
             from services.milvus_service import MilvusService
-            result = await self.db.execute(
-                select(ModelConfig).where(ModelConfig.id == ks.embedding_model_id)
-            )
-            model_config = result.scalar_one_or_none()
-            if model_config:
-                rag = RAGService(self.db, self.tenant_id, embedding_model_config=model_config)
-                await rag.delete_knowledge_vectors([knowledge_id])
+            rag = RAGService(self.db, self.tenant_id)
+            await rag.delete_knowledge_vectors([knowledge_id])
 
-                # 检查是否还有 active 文档
+            # 检查是否还有 active 文档
                 count_result = await self.db.execute(
                     select(func.count()).where(
                         and_(

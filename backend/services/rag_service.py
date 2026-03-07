@@ -16,13 +16,12 @@ from services.milvus_service import MilvusService
 class RAGService:
     """RAG 检索服务"""
 
-    def __init__(self, db: AsyncSession, tenant_id: str, embedding_model_config=None, rerank_model_config=None):
+    def __init__(self, db: AsyncSession, tenant_id: str):
         self.db = db
         self.tenant_id = tenant_id
         self.knowledge_service = KnowledgeService(db, tenant_id)
-        self.embedding_service = EmbeddingService(tenant_id, model_config=embedding_model_config)
+        self.embedding_service = EmbeddingService(tenant_id)
         self.milvus_service = MilvusService(tenant_id)
-        self.rerank_model_config = rerank_model_config
 
     async def retrieve(
         self,
@@ -92,10 +91,6 @@ class RAGService:
                             "tags": knowledge_item.tags,
                         })
 
-                # 5. 可选重排
-                if self.rerank_model_config and results:
-                    results = await self._apply_rerank(query, results)
-
                 return results
 
             except Exception as e:
@@ -106,73 +101,6 @@ class RAGService:
         else:
             # 使用关键词搜索
             return await self._keyword_search(query, top_k, knowledge_type)
-
-    async def _apply_rerank(self, query: str, results: list[dict]) -> list[dict]:
-        """
-        使用重排模型对检索结果重新排序
-
-        支持 Qwen（DashScope）和 SiliconFlow 的 rerank API。
-        """
-        import httpx
-        from core.http_client import get_http_client
-
-        provider = self.rerank_model_config.provider
-        api_key = self.rerank_model_config.api_key
-        model_name = self.rerank_model_config.model_name
-        documents = [r.get("content", "")[:512] for r in results]
-
-        try:
-            client = get_http_client()
-            if provider == "qwen":
-                    resp = await client.post(
-                        "https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank",
-                        headers={
-                            "Authorization": f"Bearer {api_key}",
-                            "Content-Type": "application/json",
-                        },
-                        json={
-                            "model": model_name,
-                            "input": {"query": query, "documents": documents},
-                            "parameters": {
-                                "top_n": len(results),
-                                "return_documents": False,
-                            },
-                        },
-                    )
-                    if resp.status_code == 200:
-                        reranked = sorted(
-                            resp.json().get("output", {}).get("results", []),
-                            key=lambda x: x["relevance_score"],
-                            reverse=True,
-                        )
-                        return [results[r["index"]] for r in reranked]
-
-            elif provider == "siliconflow":
-                    resp = await client.post(
-                        "https://api.siliconflow.cn/v1/rerank",
-                        headers={
-                            "Authorization": f"Bearer {api_key}",
-                            "Content-Type": "application/json",
-                        },
-                        json={
-                            "model": model_name,
-                            "query": query,
-                            "documents": documents,
-                            "top_n": len(results),
-                        },
-                    )
-                    if resp.status_code == 200:
-                        reranked = sorted(
-                            resp.json()["results"],
-                            key=lambda x: x["relevance_score"],
-                            reverse=True,
-                        )
-                        return [results[r["index"]] for r in reranked]
-
-        except Exception as e:
-            print(f"[RAGService] Rerank 失败，返回原始顺序: {e}")
-
-        return results
 
     async def _keyword_search(
         self,
