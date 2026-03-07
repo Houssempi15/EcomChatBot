@@ -15,7 +15,6 @@ from api.dependencies import DBDep, TenantFlexDep
 from models.model_config import ModelConfig
 from schemas import ApiResponse
 from services.llm_service import LLMService
-from services.model_config_service import ModelConfigService
 from services.knowledge_service import KnowledgeService
 from services.rag_service import RAGService
 from services.prompt_service import PromptService

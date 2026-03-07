@@ -14,7 +14,6 @@ from schemas import ApiResponse
 from services import RAGService
 from services.knowledge_service import KnowledgeService
 from services.llm_service import LLMService
-from services.model_config_service import ModelConfigService
 from services.prompt_service import PromptService
 
 router = APIRouter(prefix="/rag", tags=["RAG 检索增强"])
