@@ -90,6 +90,34 @@ class Settings(BaseSettings):
     tos_region: str = "cn-beijing"
     tos_bucket: str = "ecom-chatbot"
 
+    # ============ 火山引擎模型配置 ============
+    # 火山引擎统一配置
+    volcengine_api_key: str = ""
+    volcengine_api_base: str = "https://ark.cn-beijing.volces.com/api/v3"
+
+    # LLM 配置
+    llm_provider: str = "volcengine"
+    llm_model: str = "deepseek-v3-2-251201"
+    llm_temperature: float = 0.7
+    llm_max_tokens: int = 2000
+
+    # Embedding 配置
+    embedding_provider: str = "volcengine"
+    embedding_model: str = "doubao-embedding-vision-251215"
+    embedding_dimension: int = 2048
+
+    # Rerank 配置（可选）
+    rerank_provider: str = ""
+    rerank_model: str = ""
+
+    # 图片生成配置
+    image_gen_provider: str = "volcengine"
+    image_gen_model: str = "doubao-seedream-5-0-260128"
+
+    # 视频生成配置
+    video_gen_provider: str = "volcengine"
+    video_gen_model: str = "doubao-seedance-1-5-pro-251215"
+
     # RabbitMQ & Celery
     rabbitmq_url: str = "amqp://guest:guest@localhost:5672/"
     celery_broker_url: str = "redis://localhost:6379/1"
