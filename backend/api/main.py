@@ -16,22 +16,24 @@ from api.routers import (
     audit,
     auth,
     conversation,
+    follow_up,
     health,
     intent,
     knowledge,
-    model_config,
     monitor,
     order,
+    outreach,
     payment,
     platform,
     platform_gateway,
-    playground,
     pdd_webhook,
     product,
     content_generation,
     pricing,
     quality,
     rag,
+    recommendation,
+    segment,
     sensitive_word,
     setup,
     statistics,
@@ -264,7 +266,6 @@ app.include_router(rag.router, prefix=settings.api_v1_prefix)
 app.include_router(monitor.router, prefix=settings.api_v1_prefix)
 app.include_router(quality.router, prefix=settings.api_v1_prefix)
 app.include_router(webhook.router, prefix=settings.api_v1_prefix)
-app.include_router(model_config.router, prefix=settings.api_v1_prefix)
 app.include_router(statistics.router, prefix=settings.api_v1_prefix)
 app.include_router(analytics.router, prefix=settings.api_v1_prefix)
 app.include_router(sensitive_word.router, prefix=settings.api_v1_prefix)
@@ -272,12 +273,15 @@ app.include_router(audit.router, prefix=settings.api_v1_prefix)
 app.include_router(setup.router, prefix=settings.api_v1_prefix)
 app.include_router(platform.router, prefix=settings.api_v1_prefix)
 app.include_router(platform_gateway.router, prefix=settings.api_v1_prefix)
-app.include_router(playground.router, prefix=settings.api_v1_prefix)
 app.include_router(product.router, prefix=settings.api_v1_prefix)
 app.include_router(content_generation.router, prefix=settings.api_v1_prefix)
 app.include_router(pricing.router, prefix=settings.api_v1_prefix)
 app.include_router(order.router, prefix=settings.api_v1_prefix)
 app.include_router(analysis_report.router, prefix=settings.api_v1_prefix)
+app.include_router(outreach.router, prefix=settings.api_v1_prefix)
+app.include_router(segment.router, prefix=settings.api_v1_prefix)
+app.include_router(follow_up.router, prefix=settings.api_v1_prefix)
+app.include_router(recommendation.router, prefix=settings.api_v1_prefix)
 app.include_router(pdd_webhook.router)
 
 

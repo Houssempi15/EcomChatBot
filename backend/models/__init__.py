@@ -7,7 +7,6 @@ from models.base import BaseModel, TenantBaseModel
 from models.conversation import Conversation, Message, User
 from models.knowledge import KnowledgeBase, KnowledgeUsageLog
 from models.knowledge_settings import KnowledgeSettings
-from models.model_config import ModelConfig, LLMProvider
 from models.payment import (
     OrderStatus,
     PaymentChannel,
@@ -44,6 +43,16 @@ from models.order import (
     ReportType, ReportStatus,
 )
 from models.sensitive_word import SensitiveWord
+from models.customer_segment import CustomerSegment, CustomerSegmentMember, SegmentType
+from models.outreach import (
+    OutreachCampaign, OutreachRule, OutreachTask,
+    CampaignType, CampaignStatus, ContentStrategy, OutreachTaskStatus, RuleType,
+)
+from models.follow_up import FollowUpPlan, FollowUpReason, FollowUpStatus
+from models.recommendation import (
+    RecommendationRule, RecommendationLog,
+    RecommendRuleType, RecommendTriggerType, RecommendStrategy,
+)
 
 __all__ = [
     # Base
@@ -69,9 +78,6 @@ __all__ = [
     "KnowledgeBase",
     "KnowledgeUsageLog",
     "KnowledgeSettings",
-    # Model Config
-    "ModelConfig",
-    "LLMProvider",
     # Payment
     "PaymentOrder",
     "PaymentTransaction",
@@ -126,4 +132,27 @@ __all__ = [
     "ReportStatus",
     # Sensitive Word
     "SensitiveWord",
+    # Customer Segment
+    "CustomerSegment",
+    "CustomerSegmentMember",
+    "SegmentType",
+    # Outreach
+    "OutreachCampaign",
+    "OutreachRule",
+    "OutreachTask",
+    "CampaignType",
+    "CampaignStatus",
+    "ContentStrategy",
+    "OutreachTaskStatus",
+    "RuleType",
+    # Follow Up
+    "FollowUpPlan",
+    "FollowUpReason",
+    "FollowUpStatus",
+    # Recommendation
+    "RecommendationRule",
+    "RecommendationLog",
+    "RecommendRuleType",
+    "RecommendTriggerType",
+    "RecommendStrategy",
 ]
