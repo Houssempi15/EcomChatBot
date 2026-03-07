@@ -21,32 +21,20 @@ _llm_circuit_breaker = CircuitBreaker("LLM", failure_threshold=5, recovery_timeo
 class LLMService:
     """LLM 服务类"""
 
-    def __init__(self, tenant_id: str, model_name: str | None = None, model_config=None):
+    def __init__(self, tenant_id: str):
         """
         初始化 LLM 服务
 
         Args:
             tenant_id: 租户 ID
-            model_name: 模型名称，如果为 None 则使用默认模型（当 model_config 存在时忽略）
-            model_config: ModelConfig 实例，优先于环境变量配置
         """
         self.tenant_id = tenant_id
-        self._model_config = model_config
-
-        if model_config is not None:
-            self.model_name = model_config.model_name
-            self._provider = model_config.provider
-            self._api_key = model_config.api_key or settings.openai_api_key
-            self._api_base = model_config.api_base or settings.openai_api_base
-            self._temperature = float(model_config.temperature) if model_config.temperature is not None else 0.7
-            self._max_tokens = model_config.max_tokens or 1000
-        else:
-            self.model_name = model_name or settings.default_llm_model
-            self._provider = "openai"
-            self._api_key = settings.openai_api_key
-            self._api_base = settings.openai_api_base
-            self._temperature = 0.7
-            self._max_tokens = 1000
+        self.model_name = settings.llm_model
+        self._provider = settings.llm_provider
+        self._api_key = settings.volcengine_api_key
+        self._api_base = settings.volcengine_api_base
+        self._temperature = settings.llm_temperature
+        self._max_tokens = settings.llm_max_tokens
 
         # 初始化 LLM
         self.llm = self._initialize_llm()

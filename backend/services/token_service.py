@@ -177,7 +177,7 @@ class TokenService:
         summary_prompt += "\n\n请生成摘要："
 
         # 调用LLM生成摘要
-        llm_service = LLMService(self.db, self.tenant_id)
+        llm_service = LLMService(self.tenant_id)
         try:
             from langchain_core.messages import HumanMessage
 

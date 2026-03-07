@@ -32,7 +32,7 @@ class EnhancedRAGService:
         self.embedding_service = EmbeddingService(tenant_id)
         self.milvus_service = MilvusService(tenant_id)
         self.knowledge_service = KnowledgeService(db, tenant_id)
-        self.llm_service = LLMService(db, tenant_id)
+        self.llm_service = LLMService(tenant_id)
 
     async def query_with_full_pipeline(
         self,
