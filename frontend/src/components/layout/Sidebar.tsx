@@ -12,7 +12,6 @@ import {
   ShoppingCartOutlined,
   ShoppingOutlined,
   UserOutlined,
-  ExperimentOutlined,
   FileImageOutlined,
   VideoCameraOutlined,
   AppstoreOutlined,
@@ -21,6 +20,11 @@ import {
   FundOutlined,
   DollarOutlined,
   FormOutlined,
+  SendOutlined,
+  TeamOutlined,
+  ClockCircleOutlined,
+  GiftOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { useAuthStore, useUIStore } from '@/store';
 import { settingsApi } from '@/lib/api/settings';
@@ -68,14 +72,21 @@ const menuItems = [
     ],
   },
   {
+    key: 'outreach',
+    icon: <SendOutlined />,
+    label: '智能触达',
+    children: [
+      { key: '/outreach', icon: <SendOutlined />, label: '外呼活动' },
+      { key: '/outreach/rules', icon: <ThunderboltOutlined />, label: '自动规则' },
+      { key: '/outreach/segments', icon: <TeamOutlined />, label: '客户分群' },
+      { key: '/outreach/follow-up', icon: <ClockCircleOutlined />, label: '定时跟进' },
+      { key: '/outreach/recommendations', icon: <GiftOutlined />, label: '增购推荐' },
+    ],
+  },
+  {
     key: '/pricing',
     icon: <DollarOutlined />,
     label: '智能定价',
-  },
-  {
-    key: '/playground',
-    icon: <ExperimentOutlined />,
-    label: 'Playground',
   },
   {
     key: '/settings',
