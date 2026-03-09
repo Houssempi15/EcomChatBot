@@ -228,8 +228,8 @@ async def create_generation(
         elif request.task_type == "video":
             await quota_service.check_video_quota(tenant_id)
         else:
-            # title/description 使用 LLM，消耗回复配额
-            await quota_service.check_reply_quota(tenant_id)
+            # title/description 使用 LLM，AI回复不限量，无需检查
+            pass
     except QuotaExceededError as e:
         return ApiResponse(
             success=False,

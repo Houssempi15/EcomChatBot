@@ -1,14 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Card, Progress, Typography } from 'antd';
+import { useEffect, useState, useCallback } from 'react';
+import { Card, Progress, Typography, Button, Modal, Tag, Radio, message } from 'antd';
 import {
   MessageOutlined,
   PictureOutlined,
   VideoCameraOutlined,
+  ShoppingCartOutlined,
 } from '@ant-design/icons';
 import Skeleton from '@/components/ui/Loading/Skeleton';
-import { subscriptionApi, QuotaUsage } from '@/lib/api/subscription';
+import { subscriptionApi, QuotaUsage, AddonPack } from '@/lib/api/subscription';
+import Image from 'next/image';
 
 const { Title, Text } = Typography;
 
@@ -17,11 +19,14 @@ interface QuotaItemProps {
   label: string;
   used: number;
   quota: number;
+  addonBalance?: number;
   color: string;
+  onBuyAddon?: () => void;
 }
 
-function QuotaItem({ icon, label, used, quota, color }: QuotaItemProps) {
-  const percent = quota > 0 ? Math.round((used / quota) * 100) : 0;
+function QuotaItem({ icon, label, used, quota, addonBalance = 0, color, onBuyAddon }: QuotaItemProps) {
+  const total = quota + addonBalance;
+  const percent = total > 0 ? Math.round((used / total) * 100) : 0;
   const status = percent >= 100 ? 'exception' : percent >= 80 ? 'active' : 'normal';
 
   return (
@@ -35,9 +40,25 @@ function QuotaItem({ icon, label, used, quota, color }: QuotaItemProps) {
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-center mb-1">
           <Text className="text-sm font-medium">{label}</Text>
-          <Text className="text-xs text-gray-500">
-            {used.toLocaleString()} / {quota.toLocaleString()}
-          </Text>
+          <div className="flex items-center gap-2">
+            <Text className="text-xs text-gray-500">
+              {used.toLocaleString()} / {total.toLocaleString()}
+              {addonBalance > 0 && (
+                <span className="text-purple-500 ml-1">(含加量包 {addonBalance})</span>
+              )}
+            </Text>
+            {onBuyAddon && (
+              <Button
+                type="link"
+                size="small"
+                icon={<ShoppingCartOutlined />}
+                onClick={onBuyAddon}
+                className="!p-0 !h-auto text-xs"
+              >
+                购买加量包
+              </Button>
+            )}
+          </div>
         </div>
         <Progress
           percent={percent}
@@ -51,11 +72,43 @@ function QuotaItem({ icon, label, used, quota, color }: QuotaItemProps) {
   );
 }
 
+function UnlimitedQuotaItem({ icon, label, used, color }: { icon: React.ReactNode; label: string; used: number; color: string }) {
+  return (
+    <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+      <div
+        className="flex items-center justify-center w-10 h-10 rounded-lg text-white text-lg flex-shrink-0"
+        style={{ backgroundColor: color }}
+      >
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <Text className="text-sm font-medium">{label}</Text>
+            <Tag color="blue">不限量</Tag>
+          </div>
+          <Text className="text-xs text-gray-500">
+            本月已用 {used.toLocaleString()} 次
+          </Text>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function QuotaUsagePanel() {
   const [loading, setLoading] = useState(true);
   const [quota, setQuota] = useState<QuotaUsage | null>(null);
+  const [addonModalOpen, setAddonModalOpen] = useState(false);
+  const [addonPacks, setAddonPacks] = useState<AddonPack[]>([]);
+  const [selectedAddon, setSelectedAddon] = useState<string>('');
+  const [paymentChannel, setPaymentChannel] = useState<string>('alipay');
+  const [purchasing, setPurchasing] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+  const [orderNumber, setOrderNumber] = useState<string>('');
+  const [pollTimer, setPollTimer] = useState<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
+  const fetchQuota = useCallback(() => {
     subscriptionApi
       .getQuotaUsage()
       .then((res) => {
@@ -64,6 +117,86 @@ export default function QuotaUsagePanel() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    fetchQuota();
+  }, [fetchQuota]);
+
+  // 清理轮询定时器
+  useEffect(() => {
+    return () => {
+      if (pollTimer) clearInterval(pollTimer);
+    };
+  }, [pollTimer]);
+
+  const handleOpenAddonModal = async () => {
+    setAddonModalOpen(true);
+    setQrCodeUrl('');
+    setOrderNumber('');
+    try {
+      const res = await subscriptionApi.getAddonPacks();
+      if (res.success && res.data) {
+        setAddonPacks(res.data);
+        if (res.data.length > 0) setSelectedAddon(res.data[0].addon_type);
+      }
+    } catch {
+      message.error('获取加量包列表失败');
+    }
+  };
+
+  const handlePurchase = async () => {
+    if (!selectedAddon) return;
+    setPurchasing(true);
+    try {
+      const res = await subscriptionApi.purchaseAddon({
+        addon_type: selectedAddon,
+        payment_channel: paymentChannel,
+      });
+      if (res.success && res.data) {
+        setQrCodeUrl(res.data.qr_code_url);
+        setOrderNumber(res.data.order_number);
+        // 开始轮询订单状态
+        startPolling(res.data.order_number);
+      } else {
+        message.error('创建订单失败');
+      }
+    } catch {
+      message.error('购买加量包失败');
+    } finally {
+      setPurchasing(false);
+    }
+  };
+
+  const startPolling = (orderNum: string) => {
+    if (pollTimer) clearInterval(pollTimer);
+    const timer = setInterval(async () => {
+      try {
+        const res = await subscriptionApi.syncOrder(orderNum);
+        if (res.success && res.data?.order?.status === 'paid') {
+          clearInterval(timer);
+          setPollTimer(null);
+          message.success('支付成功！加量包余额已更新');
+          setQrCodeUrl('');
+          setOrderNumber('');
+          setAddonModalOpen(false);
+          fetchQuota();
+        }
+      } catch {
+        // 忽略轮询错误
+      }
+    }, 3000);
+    setPollTimer(timer);
+  };
+
+  const handleCloseModal = () => {
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      setPollTimer(null);
+    }
+    setAddonModalOpen(false);
+    setQrCodeUrl('');
+    setOrderNumber('');
+  };
 
   if (loading) {
     return (
@@ -81,38 +214,109 @@ export default function QuotaUsagePanel() {
   if (!quota) return null;
 
   return (
-    <Card className="mb-4">
-      <div className="flex justify-between items-center mb-4">
-        <Title level={5} className="!mb-0">
-          本月配额
-        </Title>
-        <Text type="secondary" className="text-xs">
-          {quota.billing_period}
-        </Text>
-      </div>
-      <div className="space-y-3">
-        <QuotaItem
-          icon={<MessageOutlined />}
-          label="AI 回复"
-          used={quota.reply_used}
-          quota={quota.reply_quota}
-          color="#1677ff"
-        />
-        <QuotaItem
-          icon={<PictureOutlined />}
-          label="图片生成"
-          used={quota.image_gen_used}
-          quota={quota.image_gen_quota}
-          color="#722ed1"
-        />
-        <QuotaItem
-          icon={<VideoCameraOutlined />}
-          label="视频生成"
-          used={quota.video_gen_used}
-          quota={quota.video_gen_quota}
-          color="#13c2c2"
-        />
-      </div>
-    </Card>
+    <>
+      <Card className="mb-4">
+        <div className="flex justify-between items-center mb-4">
+          <Title level={5} className="!mb-0">
+            本月配额
+          </Title>
+          <Text type="secondary" className="text-xs">
+            {quota.billing_period}
+          </Text>
+        </div>
+        <div className="space-y-3">
+          <UnlimitedQuotaItem
+            icon={<MessageOutlined />}
+            label="AI 回复"
+            used={quota.reply_used}
+            color="#1677ff"
+          />
+          <QuotaItem
+            icon={<PictureOutlined />}
+            label="图片生成"
+            used={quota.image_gen_used}
+            quota={quota.image_gen_quota}
+            addonBalance={quota.image_gen_addon_balance}
+            color="#722ed1"
+            onBuyAddon={handleOpenAddonModal}
+          />
+          <QuotaItem
+            icon={<VideoCameraOutlined />}
+            label="视频生成"
+            used={quota.video_gen_used}
+            quota={quota.video_gen_quota}
+            addonBalance={quota.video_gen_addon_balance}
+            color="#13c2c2"
+            onBuyAddon={handleOpenAddonModal}
+          />
+        </div>
+      </Card>
+
+      <Modal
+        title="购买加量包"
+        open={addonModalOpen}
+        onCancel={handleCloseModal}
+        footer={qrCodeUrl ? null : undefined}
+        onOk={handlePurchase}
+        okText="立即购买"
+        okButtonProps={{ loading: purchasing, disabled: !selectedAddon }}
+        cancelText="取消"
+      >
+        {qrCodeUrl ? (
+          <div className="text-center py-4">
+            <Text className="block mb-4">请使用{paymentChannel === 'alipay' ? '支付宝' : '微信'}扫码支付</Text>
+            <div className="inline-block p-4 bg-white border rounded-lg">
+              <Image
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrCodeUrl)}`}
+                alt="支付二维码"
+                width={200}
+                height={200}
+              />
+            </div>
+            <Text type="secondary" className="block mt-4 text-xs">
+              订单号: {orderNumber}
+            </Text>
+            <Text type="secondary" className="block text-xs">
+              支付完成后将自动刷新
+            </Text>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <Text className="block mb-2 font-medium">选择加量包</Text>
+              <Radio.Group
+                value={selectedAddon}
+                onChange={(e) => setSelectedAddon(e.target.value)}
+                className="w-full"
+              >
+                <div className="space-y-2">
+                  {addonPacks.map((pack) => (
+                    <Radio key={pack.addon_type} value={pack.addon_type} className="w-full">
+                      <div className="inline-flex items-center gap-2">
+                        <span>{pack.name}</span>
+                        <Tag color="orange">¥{pack.price}</Tag>
+                        <Text type="secondary" className="text-xs">
+                          {pack.credits} 次
+                        </Text>
+                      </div>
+                    </Radio>
+                  ))}
+                </div>
+              </Radio.Group>
+            </div>
+            <div>
+              <Text className="block mb-2 font-medium">支付方式</Text>
+              <Radio.Group
+                value={paymentChannel}
+                onChange={(e) => setPaymentChannel(e.target.value)}
+              >
+                <Radio value="alipay">支付宝</Radio>
+                <Radio value="wechat">微信支付</Radio>
+              </Radio.Group>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </>
   );
 }

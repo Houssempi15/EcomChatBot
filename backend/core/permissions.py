@@ -113,27 +113,24 @@ SUBSCRIPTION_PLANS = {
     "annual":      {"name": "年付版", "price": 1699, "days": 365},
 }
 
-# 配额常量定义
+# 配额常量定义（AI回复不限量，仅图片/视频有月度配额）
 QUOTA_CONFIGS = {
     # 正式套餐配额（月度）
     "standard": {
-        "reply_quota": 3000,
         "image_gen_quota": 100,
         "video_gen_quota": 10,
     },
     # 试用版配额（减半）
     "trial": {
-        "reply_quota": 1500,
         "image_gen_quota": 50,
         "video_gen_quota": 5,
     },
 }
 
-# 加量包定义
+# 加量包定义（永久有效）
 ADDON_PACKAGES = {
-    "reply_addon": {"price": 29, "reply_quota": 1000},
-    "image_addon": {"price": 19, "image_gen_quota": 50},
-    "video_addon": {"price": 49, "video_gen_quota": 10},
+    "image_addon": {"name": "图片生成加量包", "price": 19, "credits": 50, "credit_type": "image"},
+    "video_addon": {"name": "视频生成加量包", "price": 49, "credits": 10, "credit_type": "video"},
 }
 
 

@@ -27,6 +27,7 @@ from models.payment import (
 from models.tenant import Subscription, Tenant
 from services.payment_gateway import PaymentGateway
 from core.config import settings
+from core.permissions import ADDON_PACKAGES
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,12 @@ PLAN_CONFIG: Dict[str, tuple[Decimal, int]] = {
     "quarterly":   (Decimal("499.00"), 90),
     "semi_annual": (Decimal("899.00"), 180),
     "annual":      (Decimal("1699.00"), 365),
+}
+
+# 加量包配置：addon_key -> (价格, credit_type, credits)
+ADDON_CONFIG: Dict[str, tuple[Decimal, str, int]] = {
+    "image_addon": (Decimal("19.00"), "image", 50),
+    "video_addon": (Decimal("49.00"), "video", 10),
 }
 
 
@@ -126,9 +133,18 @@ class PaymentService:
             if not tenant:
                 raise TenantNotFoundException(str(tenant_id))
 
-            amount = self.get_plan_amount(plan_type)
+            # 加量包订单走独立逻辑
+            if subscription_type == SubscriptionType.ADDON:
+                if plan_type not in ADDON_CONFIG:
+                    raise PaymentException(f"无效的加量包类型: {plan_type}")
+                amount = ADDON_CONFIG[plan_type][0]
+                pkg = ADDON_PACKAGES.get(plan_type, {})
+                subject = description or pkg.get("name", f"加量包-{plan_type}")
+            else:
+                amount = self.get_plan_amount(plan_type)
+                subject = description or f"电商智能客服-{plan_type}套餐"
+
             order_number = self.generate_order_number()
-            subject = description or f"电商智能客服-{plan_type}套餐"
 
             order = PaymentOrder(
                 order_number=order_number,
@@ -357,6 +373,20 @@ class PaymentService:
     async def _activate_subscription(self, order: PaymentOrder) -> None:
         """激活订阅"""
         try:
+            # 加量包订单：直接增加余额，不涉及订阅
+            if order.subscription_type == SubscriptionType.ADDON:
+                from services.quota_service import QuotaService
+                quota_service = QuotaService(self.db)
+                pkg = ADDON_PACKAGES.get(order.plan_type)
+                if pkg:
+                    await quota_service.add_addon_credits(
+                        tenant_id=str(order.tenant_id),
+                        credit_type=pkg["credit_type"],
+                        amount=pkg["credits"],
+                    )
+                logger.info(f"Added addon credits for tenant: {order.tenant_id}, pack: {order.plan_type}")
+                return
+
             stmt = select(Subscription).where(
                 Subscription.tenant_id == order.tenant_id,
                 Subscription.status == "active",

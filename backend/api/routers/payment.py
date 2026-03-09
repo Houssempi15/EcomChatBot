@@ -14,8 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.dependencies import TenantFlexDep, DBDep
 from models.payment import SubscriptionType, PaymentChannel
 from schemas.base import ApiResponse
-from services.payment_service import PaymentService, PLAN_CONFIG
+from services.payment_service import PaymentService, PLAN_CONFIG, ADDON_CONFIG
 from services.subscription_service import SubscriptionService
+from core.permissions import ADDON_PACKAGES
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,11 @@ class CreateOrderRequest(BaseModel):
 class RefundRequest(BaseModel):
     refund_amount: Optional[Decimal] = None
     refund_reason: str = "用户申请退款"
+
+
+class PurchaseAddonRequest(BaseModel):
+    addon_type: str  # "image_addon" | "video_addon"
+    payment_channel: str = "alipay"  # "alipay" | "wechat"
 
 
 # ===== 订单接口 =====
@@ -441,3 +447,59 @@ async def change_plan(
     except Exception as e:
         logger.error(f"Error changing plan: {e}")
         raise HTTPException(status_code=500, detail=f"变更套餐失败: {str(e)}")
+
+
+# ===== 加量包接口 =====
+
+@router.get("/addon-packs", summary="获取可购买的加量包列表")
+async def get_addon_packs():
+    """获取所有可购买的加量包信息"""
+    packs = []
+    for key, pkg in ADDON_PACKAGES.items():
+        packs.append({
+            "addon_type": key,
+            "name": pkg["name"],
+            "price": pkg["price"],
+            "credits": pkg["credits"],
+            "credit_type": pkg["credit_type"],
+        })
+    return ApiResponse(data=packs)
+
+
+@router.post("/addon-packs/purchase", summary="购买加量包")
+async def purchase_addon(
+    request_data: PurchaseAddonRequest,
+    tenant_id: TenantFlexDep,
+    db: DBDep,
+):
+    """购买加量包，返回支付二维码"""
+    if request_data.addon_type not in ADDON_CONFIG:
+        raise HTTPException(status_code=400, detail=f"无效的加量包类型: {request_data.addon_type}")
+
+    channel_map = {"alipay": PaymentChannel.ALIPAY, "wechat": PaymentChannel.WECHAT}
+    channel = channel_map.get(request_data.payment_channel, PaymentChannel.ALIPAY)
+
+    try:
+        payment_service = PaymentService(db, channel=channel)
+        order, qr_url = await payment_service.create_native_payment_order(
+            tenant_id=tenant_id,
+            plan_type=request_data.addon_type,
+            subscription_type=SubscriptionType.ADDON,
+            payment_channel=channel,
+        )
+
+        return ApiResponse(data={
+            "order_id": order.id,
+            "order_number": order.order_number,
+            "amount": float(order.amount),
+            "currency": order.currency,
+            "payment_channel": channel.value,
+            "qr_code_url": qr_url,
+            "expires_at": order.expired_at.isoformat(),
+        })
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error purchasing addon: {e}")
+        raise HTTPException(status_code=500, detail=f"购买加量包失败: {str(e)}")

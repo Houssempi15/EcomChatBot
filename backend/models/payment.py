@@ -57,6 +57,7 @@ class SubscriptionType(str, Enum):
     NEW = "new"  # 新订阅
     RENEWAL = "renewal"  # 续费
     UPGRADE = "upgrade"  # 升级
+    ADDON = "addon"  # 加量包购买
 
 
 class TransactionType(str, Enum):

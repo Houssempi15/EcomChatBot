@@ -52,6 +52,7 @@ from models.outreach import (
 )
 from models.follow_up import FollowUpPlan, FollowUpReason, FollowUpStatus
 from models.quota import TenantQuota
+from models.addon_credit import TenantAddonCredit
 from models.knowledge_candidate import KnowledgeCandidate
 from models.recommendation import (
     RecommendationRule, RecommendationLog,
@@ -164,4 +165,5 @@ __all__ = [
     "RecommendStrategy",
     # Quota
     "TenantQuota",
+    "TenantAddonCredit",
 ]
