@@ -20,6 +20,12 @@ export const settingsApi = {
     return response.data;
   },
 
+  // Get API Key plaintext
+  getApiKey: async (): Promise<ApiResponse<{ api_key: string | null; api_key_prefix: string | null; message?: string }>> => {
+    const response = await apiClient.get<ApiResponse<{ api_key: string | null; api_key_prefix: string | null; message?: string }>>('/tenant/api-key');
+    return response.data;
+  },
+
   // Reset tenant API Key (returns new key once)
   resetApiKey: async (): Promise<ApiResponse<{ api_key: string; api_key_prefix: string; message: string }>> => {
     const response = await apiClient.post<ApiResponse<{ api_key: string; api_key_prefix: string; message: string }>>('/tenant/reset-api-key');

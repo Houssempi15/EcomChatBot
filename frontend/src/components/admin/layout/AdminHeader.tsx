@@ -1,12 +1,14 @@
 'use client';
 
+import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Layout, Breadcrumb, Badge, Dropdown, Button } from 'antd';
 import type { MenuProps } from 'antd';
-import { BellOutlined, HomeOutlined, MenuOutlined, SunOutlined, MoonOutlined } from '@ant-design/icons';
+import { BellOutlined, HomeOutlined, MenuOutlined, SunOutlined, MoonOutlined, UserOutlined, LockOutlined, LogoutOutlined } from '@ant-design/icons';
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
-import { useUIStore } from '@/store';
+import { useUIStore, useAdminStore } from '@/store';
+import AdminChangePasswordModal from '../AdminChangePasswordModal';
 
 const { Header: AntHeader } = Layout;
 
@@ -29,6 +31,8 @@ export default function AdminHeader() {
   const pathname = usePathname();
   const { setMobileSidebarOpen } = useUIStore();
   const { theme, setTheme } = useTheme();
+  const { admin, logout } = useAdminStore();
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const pathParts = pathname.split('/').filter(Boolean);
 
   const breadcrumbItems = [
@@ -68,6 +72,29 @@ export default function AdminHeader() {
     },
   ];
 
+  const userMenuItems: MenuProps['items'] = [
+    {
+      key: 'username',
+      label: admin?.username || '管理员',
+      disabled: true,
+      style: { fontWeight: 600 },
+    },
+    { type: 'divider' },
+    {
+      key: 'change-password',
+      icon: <LockOutlined />,
+      label: '修改密码',
+      onClick: () => setChangePasswordOpen(true),
+    },
+    {
+      key: 'logout',
+      icon: <LogoutOutlined />,
+      label: '退出登录',
+      danger: true,
+      onClick: () => logout(),
+    },
+  ];
+
   return (
     <AntHeader
       className="bg-white flex items-center justify-between shadow-sm sticky top-0 z-10 px-4 h-16 leading-[64px]"
@@ -96,7 +123,16 @@ export default function AdminHeader() {
             <BellOutlined className="text-lg text-neutral-500 cursor-pointer hover:text-brand-500 transition-colors" />
           </Badge>
         </Dropdown>
+        <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+          <Button type="text" icon={<UserOutlined />} className="text-neutral-500 hover:!text-brand-500">
+            {admin?.username || '管理员'}
+          </Button>
+        </Dropdown>
       </div>
+      <AdminChangePasswordModal
+        open={changePasswordOpen}
+        onClose={() => setChangePasswordOpen(false)}
+      />
     </AntHeader>
   );
 }

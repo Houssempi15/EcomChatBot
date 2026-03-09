@@ -1,6 +1,6 @@
 import adminApiClient from './client';
 import { ApiResponse } from '@/types';
-import { AdminLoginRequest, AdminLoginResponse } from '@/types/admin';
+import { AdminChangePasswordRequest, AdminLoginRequest, AdminLoginResponse } from '@/types/admin';
 
 export const adminAuthApi = {
   login: async (data: AdminLoginRequest): Promise<ApiResponse<AdminLoginResponse>> => {
@@ -14,6 +14,14 @@ export const adminAuthApi = {
   logout: async (): Promise<void> => {
     // Admin logout is client-side only (clear token)
     // Server-side logout can be added if needed
+  },
+
+  changePassword: async (data: AdminChangePasswordRequest): Promise<ApiResponse<{ message: string }>> => {
+    const response = await adminApiClient.post<ApiResponse<{ message: string }>>(
+      '/admin/change-password',
+      data
+    );
+    return response.data;
   },
 
   getCurrentAdmin: async (): Promise<ApiResponse<AdminLoginResponse['admin']>> => {

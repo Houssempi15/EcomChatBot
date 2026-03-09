@@ -52,6 +52,13 @@ export interface TokenRefreshResponse {
   expires_in: number;
 }
 
+// Change Password Types
+export interface ChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
+}
+
 // User Types
 export interface User {
   id: number;

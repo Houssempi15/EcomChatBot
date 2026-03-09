@@ -116,6 +116,32 @@ async def get_tenant_info_token(
     return ApiResponse(data=tenant)
 
 
+@router.get("/api-key", response_model=ApiResponse[dict])
+async def get_api_key(
+    tenant_id: TenantTokenDep,
+    db: DBDep,
+):
+    """
+    获取 API Key 明文
+
+    需要 JWT Token 认证。如果租户尚未保存明文（旧数据），返回提示需重置。
+    """
+    service = TenantService(db)
+    tenant = await service.get_tenant(tenant_id)
+
+    if tenant.api_key_plain:
+        return ApiResponse(data={
+            "api_key": tenant.api_key_plain,
+            "api_key_prefix": tenant.api_key_prefix,
+        })
+    else:
+        return ApiResponse(data={
+            "api_key": None,
+            "api_key_prefix": tenant.api_key_prefix,
+            "message": "API Key 明文不可用，请重置以获取新 Key",
+        })
+
+
 @router.post("/reset-api-key", response_model=ApiResponse[ResetApiKeyResponse])
 async def reset_api_key(
     tenant_id: TenantTokenDep,

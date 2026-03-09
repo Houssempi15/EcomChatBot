@@ -1,6 +1,7 @@
 import apiClient from './client';
 import {
   ApiResponse,
+  ChangePasswordRequest,
   LoginRequest,
   LoginResponse,
   RegisterRequest,
@@ -22,6 +23,11 @@ export const authApi = {
     const response = await apiClient.post<ApiResponse<{ message: string }>>('/auth/logout', {
       refresh_token: refreshToken,
     });
+    return response.data;
+  },
+
+  changePassword: async (data: ChangePasswordRequest): Promise<ApiResponse<{ message: string }>> => {
+    const response = await apiClient.post<ApiResponse<{ message: string }>>('/auth/change-password', data);
     return response.data;
   },
 

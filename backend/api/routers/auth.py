@@ -14,6 +14,7 @@ from core import (
 )
 from schemas import ApiResponse
 from schemas.tenant import (
+    ChangePasswordRequest,
     TenantLoginRequest,
     TenantLoginResponse,
     TenantLogoutRequest,
@@ -143,6 +144,27 @@ async def refresh_token(
 
     except ValueError as e:
         raise InvalidTokenException(str(e))
+
+
+@router.post("/change-password", response_model=ApiResponse[dict])
+async def change_password(
+    password_data: ChangePasswordRequest,
+    tenant_id: TenantTokenDep,
+    db: DBDep,
+):
+    """
+    修改密码
+
+    修改当前租户的登录密码，成功后 refresh_token 失效，需重新登录
+    """
+    service = TenantService(db)
+    await service.change_password(
+        tenant_id=tenant_id,
+        current_password=password_data.current_password,
+        new_password=password_data.new_password,
+    )
+
+    return ApiResponse(data={"message": "密码修改成功，请重新登录"})
 
 
 @router.post("/logout", response_model=ApiResponse[TenantLogoutResponse])

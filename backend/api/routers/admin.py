@@ -24,6 +24,7 @@ from schemas import (
     TenantUpdateStatus,
     TenantWithAPIKey,
 )
+from schemas.admin import AdminChangePasswordRequest
 from services import AdminService, AuditService, SubscriptionService, TenantService
 from core.permissions import SUBSCRIPTION_PLANS
 
@@ -81,6 +82,27 @@ async def admin_login(
     })
 
     return ApiResponse(data=response)
+
+
+@router.post("/change-password", response_model=ApiResponse[dict])
+async def admin_change_password(
+    password_data: AdminChangePasswordRequest,
+    admin: AdminDep,
+    db: DBDep,
+):
+    """
+    管理员修改密码
+
+    修改当前管理员的登录密码
+    """
+    service = AdminService(db)
+    await service.change_password(
+        admin_id=admin.admin_id,
+        old_password=password_data.current_password,
+        new_password=password_data.new_password,
+    )
+
+    return ApiResponse(data={"message": "密码修改成功"})
 
 
 # ============ 管理员管理 ============

@@ -326,6 +326,13 @@ export interface AuditStatistics {
   high_risk_operations: number;
 }
 
+// Admin Change Password Types
+export interface AdminChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
+}
+
 // Query Params Types
 export interface TenantQueryParams {
   page?: number;

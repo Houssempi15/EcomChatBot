@@ -71,6 +71,7 @@ class TenantService:
             password_hash=password_hash,
             api_key_hash=api_key_hash,
             api_key_prefix=api_key_prefix,  # 保存API Key前缀用于快速认证
+            api_key_plain=api_key,  # 保存明文用于展示
             status="active",
             current_plan=tenant_data.initial_plan,
         )
@@ -283,6 +284,7 @@ class TenantService:
         new_api_key = generate_api_key()
         tenant.api_key_hash = hash_api_key(new_api_key)
         tenant.api_key_prefix = new_api_key[:12] if len(new_api_key) >= 12 else new_api_key  # 更新前缀
+        tenant.api_key_plain = new_api_key  # 保存明文用于展示
 
         await self.db.commit()
         await self.db.refresh(tenant)
@@ -438,6 +440,7 @@ class TenantService:
             contact_phone=register_data.contact_phone,
             api_key_hash=api_key_hash_value,
             api_key_prefix=api_key_prefix,
+            api_key_plain=api_key,  # 保存明文用于展示
             password_hash=password_hash_value,
             status="active",
             current_plan="trial",
@@ -557,6 +560,25 @@ class TenantService:
         tenant = await self.get_tenant(tenant_id)
         tenant.login_attempts = 0
         tenant.locked_until = None
+        await self.db.commit()
+
+    async def change_password(
+        self,
+        tenant_id: str,
+        current_password: str,
+        new_password: str,
+    ) -> None:
+        """修改密码"""
+        tenant = await self.get_tenant(tenant_id)
+
+        # 验证当前密码
+        if not tenant.password_hash or not verify_password(current_password, tenant.password_hash):
+            raise AuthenticationException("当前密码错误")
+
+        # 更新密码
+        tenant.password_hash = hash_password(new_password)
+        # 清除 refresh_token，要求其他设备重新登录
+        tenant.refresh_token_hash = None
         await self.db.commit()
 
     async def update_tenant_config(

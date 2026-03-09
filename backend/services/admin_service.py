@@ -10,6 +10,7 @@ from core import (
     AccountLockedException,
     AdminNotFoundException,
     AdminRole,
+    AuthenticationException,
     DuplicateResourceException,
     generate_admin_id,
     hash_password,
@@ -159,7 +160,7 @@ class AdminService:
 
         # 验证旧密码
         if not verify_password(old_password, admin.password_hash):
-            raise ValueError("原密码错误")
+            raise AuthenticationException("原密码错误")
 
         # 更新密码
         admin.password_hash = hash_password(new_password)

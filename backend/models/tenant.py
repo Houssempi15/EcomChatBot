@@ -45,6 +45,9 @@ class Tenant(BaseModel):
         String(16), comment="API密钥前缀(用于快速查找)"
     )
     api_key_salt: Mapped[str | None] = mapped_column(String(64), comment="API密钥盐值")
+    api_key_plain: Mapped[str | None] = mapped_column(
+        String(255), comment="API密钥明文(用于展示)"
+    )
 
     # 密码认证信息
     login_attempts: Mapped[int] = mapped_column(Integer, default=0, comment="登录失败次数")

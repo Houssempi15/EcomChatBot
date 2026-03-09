@@ -7,6 +7,7 @@ import {
   BellOutlined,
   ShopOutlined,
   CrownOutlined,
+  LockOutlined,
 } from '@ant-design/icons';
 
 const { Text } = Typography;
@@ -41,6 +42,11 @@ const menuItems = [
     key: 'subscription',
     icon: <CrownOutlined />,
     label: '订阅管理',
+  },
+  {
+    key: 'password',
+    icon: <LockOutlined />,
+    label: '修改密码',
   },
 ];
 

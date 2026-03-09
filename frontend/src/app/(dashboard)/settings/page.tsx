@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Row, Col, Card, Typography, message, Alert, Form, Input, Button, Modal, Tabs } from 'antd';
 import Skeleton from '@/components/ui/Loading/Skeleton';
-import { SettingsMenu, SubscriptionPanel } from '@/components/settings';
-import { CopyOutlined, KeyOutlined, ExclamationCircleOutlined, PlusOutlined } from '@ant-design/icons';
+import { SettingsMenu, SubscriptionPanel, ChangePasswordForm } from '@/components/settings';
+import { CopyOutlined, KeyOutlined, ExclamationCircleOutlined, PlusOutlined, EyeOutlined, EyeInvisibleOutlined } from '@ant-design/icons';
 import { useAuthStore } from '@/store';
 import { platformApi, PlatformConfig } from '@/lib/api/platform';
 import { settingsApi } from '@/lib/api/settings';
@@ -21,11 +21,10 @@ export default function SettingsPage() {
   const [selectedMenu, setSelectedMenu] = useState('api');
   const { tenantId } = useAuthStore();
   const [planName, setPlanName] = useState<string | null>(null);
-  const [apiKeyPrefix, setApiKeyPrefix] = useState<string | null>(null);
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [apiKeyVisible, setApiKeyVisible] = useState(false);
   const [apiKeyLoading, setApiKeyLoading] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
-  const [newApiKeyModal, setNewApiKeyModal] = useState(false);
-  const [newApiKey, setNewApiKey] = useState('');
   const [platformConfigs, setPlatformConfigs] = useState<PlatformConfig[]>([]);
   const [pddLoading, setPddLoading] = useState(false);
   const [selectedPlatform, setSelectedPlatform] = useState('pinduoduo');
@@ -69,13 +68,11 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (selectedMenu === 'api') {
-      settingsApi.getTenantInfo().then((res) => {
+      settingsApi.getApiKey().then((res) => {
         if (res.success && res.data) {
-          setApiKeyPrefix(res.data.api_key_prefix);
+          setApiKey(res.data.api_key);
         }
-      }).catch(() => {
-        // 静默失败，前缀显示为未知
-      });
+      }).catch(() => {});
     }
   }, [selectedMenu]);
 
@@ -85,9 +82,8 @@ export default function SettingsPage() {
     try {
       const res = await settingsApi.resetApiKey();
       if (res.success && res.data) {
-        setNewApiKey(res.data.api_key);
-        setApiKeyPrefix(res.data.api_key_prefix);
-        setNewApiKeyModal(true);
+        setApiKey(res.data.api_key);
+        message.success('API Key 已重置');
       } else {
         message.error('重置失败，请重试');
       }
@@ -97,6 +93,10 @@ export default function SettingsPage() {
       setApiKeyLoading(false);
     }
   };
+
+  const maskedApiKey = apiKey
+    ? '•'.repeat(apiKey.length)
+    : '（不可用，请重置获取新 Key）';
 
   const renderContent = () => {
     switch (selectedMenu) {
@@ -132,20 +132,42 @@ export default function SettingsPage() {
                     复制
                   </Button>
                 </div>
-                <Text type="secondary" className="block mb-2">API Key 前缀:</Text>
+                <Text type="secondary" className="block mb-2">API Key:</Text>
                 <div className="flex items-center gap-2">
                   <Input
-                    value={apiKeyPrefix ? `${apiKeyPrefix}...` : '（未知，请重置获取新 Key）'}
+                    value={apiKeyVisible ? (apiKey || '') : maskedApiKey}
                     readOnly
                     style={{ flex: 1, fontFamily: 'monospace' }}
                     prefix={<KeyOutlined />}
+                    suffix={
+                      apiKey ? (
+                        <span
+                          className="cursor-pointer text-gray-400 hover:text-gray-600"
+                          onClick={() => setApiKeyVisible(!apiKeyVisible)}
+                        >
+                          {apiKeyVisible ? <EyeInvisibleOutlined /> : <EyeOutlined />}
+                        </span>
+                      ) : null
+                    }
                   />
+                  <Button
+                    icon={<CopyOutlined />}
+                    disabled={!apiKey}
+                    onClick={() => {
+                      if (apiKey) {
+                        navigator.clipboard.writeText(apiKey);
+                        message.success('已复制到剪贴板');
+                      }
+                    }}
+                  >
+                    复制
+                  </Button>
                   <Button
                     danger
                     loading={apiKeyLoading}
                     onClick={() => setResetConfirmOpen(true)}
                   >
-                    重置 API Key
+                    重置
                   </Button>
                 </div>
               </div>
@@ -170,37 +192,6 @@ export default function SettingsPage() {
             >
               <p>重置后，旧的 API Key 将<strong>立即失效</strong>，所有使用旧 Key 的集成需要同步更新。</p>
               <p>确认继续？</p>
-            </Modal>
-
-            {/* 新 Key 展示弹窗 */}
-            <Modal
-              title="API Key 已重置"
-              open={newApiKeyModal}
-              onOk={() => { setNewApiKeyModal(false); setNewApiKey(''); }}
-              onCancel={() => { setNewApiKeyModal(false); setNewApiKey(''); }}
-              okText="我已保存"
-              cancelButtonProps={{ style: { display: 'none' } }}
-            >
-              <Alert
-                message="请立即复制保存，此 Key 仅显示一次"
-                type="warning"
-                showIcon
-                className="mb-4"
-              />
-              <Input.Password
-                value={newApiKey}
-                readOnly
-                style={{ fontFamily: 'monospace' }}
-                addonAfter={
-                  <CopyOutlined
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => {
-                      navigator.clipboard.writeText(newApiKey);
-                      message.success('已复制到剪贴板');
-                    }}
-                  />
-                }
-              />
             </Modal>
           </>
         );
@@ -235,6 +226,8 @@ export default function SettingsPage() {
             />
           </Card>
         );
+      case 'password':
+        return <ChangePasswordForm />;
       case 'subscription':
         return <SubscriptionPanel />;
       case 'platform': {

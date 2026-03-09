@@ -5,7 +5,7 @@ from datetime import datetime
 import json
 import re
 
-from pydantic import EmailStr, Field, field_validator
+from pydantic import EmailStr, Field, field_validator, model_validator
 
 from schemas.base import BaseSchema, TimestampSchema
 
@@ -217,3 +217,29 @@ class TenantLogoutResponse(BaseSchema):
     """登出响应"""
 
     message: str = "登出成功"
+
+
+# ============ 修改密码 ============
+class ChangePasswordRequest(BaseSchema):
+    """修改密码请求"""
+
+    current_password: str = Field(..., description="当前密码")
+    new_password: str = Field(..., min_length=8, max_length=64, description="新密码")
+    confirm_password: str = Field(..., description="确认新密码")
+
+    @field_validator('new_password')
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        if not re.search(r'[A-Z]', v):
+            raise ValueError('密码须包含至少一个大写字母')
+        if not re.search(r'[a-z]', v):
+            raise ValueError('密码须包含至少一个小写字母')
+        if not re.search(r'\d', v):
+            raise ValueError('密码须包含至少一个数字')
+        return v
+
+    @model_validator(mode='after')
+    def check_passwords_match(self):
+        if self.new_password != self.confirm_password:
+            raise ValueError('两次输入的密码不一致')
+        return self

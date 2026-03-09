@@ -368,6 +368,18 @@ async def init_database():
         await conn.run_sync(Base.metadata.create_all)
     print("✅ 数据库表创建完成")
 
+    # 1.5 自动补齐新增字段
+    print("🔧 检查并补齐新增字段...")
+    async with engine.begin() as conn:
+        # 添加 api_key_plain 字段（如果不存在）
+        try:
+            await conn.execute(text(
+                "ALTER TABLE tenants ADD COLUMN api_key_plain VARCHAR(255)"
+            ))
+            print("  ✅ 已添加 api_key_plain 字段")
+        except Exception:
+            print("  ℹ️  api_key_plain 字段已存在，跳过")
+
     # 2. 创建默认超级管理员
     print("👤 创建默认超级管理员...")
     async with AsyncSessionLocal() as session:
