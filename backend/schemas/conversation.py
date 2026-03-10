@@ -76,7 +76,7 @@ class MessageResponse(TimestampSchema):
 class ConversationCreate(BaseSchema):
     """创建会话"""
 
-    user_id: str = Field(..., description="用户外部ID")
+    user_id: str = Field(..., max_length=128, description="用户外部ID")
     channel: str = Field("web", description="渠道")
 
 
