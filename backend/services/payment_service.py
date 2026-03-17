@@ -127,7 +127,7 @@ class PaymentService:
 
         try:
             # 验证租户
-            tenant_stmt = select(Tenant).where(Tenant.id == tenant_id)
+            tenant_stmt = select(Tenant).where(Tenant.tenant_id == tenant_id)
             tenant_result = await self.db.execute(tenant_stmt)
             tenant = tenant_result.scalar_one_or_none()
             if not tenant:
@@ -214,7 +214,7 @@ class PaymentService:
             raise PaymentException("支付网关未配置，请检查支付配置")
 
         try:
-            tenant_stmt = select(Tenant).where(Tenant.id == tenant_id)
+            tenant_stmt = select(Tenant).where(Tenant.tenant_id == tenant_id)
             tenant_result = await self.db.execute(tenant_stmt)
             tenant = tenant_result.scalar_one_or_none()
             if not tenant:
