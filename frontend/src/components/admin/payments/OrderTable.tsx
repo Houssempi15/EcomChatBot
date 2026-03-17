@@ -1,9 +1,12 @@
 'use client';
 
-import { Table, Tag, Typography } from 'antd';
+import { useState } from 'react';
+import { Table, Tag, Typography, Button, message } from 'antd';
+import { SyncOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import Link from 'next/link';
 import { PaymentOrderInfo, PaymentOrderStatus } from '@/types/admin';
+import { adminPaymentsApi } from '@/lib/api/admin';
 
 const { Text } = Typography;
 
@@ -14,6 +17,7 @@ interface OrderTableProps {
   page: number;
   pageSize: number;
   onPageChange: (page: number, pageSize: number) => void;
+  onRefresh?: () => void;
 }
 
 const statusConfig: Record<PaymentOrderStatus, { color: string; label: string }> = {
@@ -35,7 +39,27 @@ export default function OrderTable({
   page,
   pageSize,
   onPageChange,
+  onRefresh,
 }: OrderTableProps) {
+  const [syncingOrders, setSyncingOrders] = useState<Set<string>>(new Set());
+
+  const handleSync = async (orderNumber: string) => {
+    setSyncingOrders(prev => new Set(prev).add(orderNumber));
+    try {
+      const res = await adminPaymentsApi.syncOrder(orderNumber);
+      if (res.success) {
+        message.success('订单状态已同步');
+        onRefresh?.();
+      } else {
+        message.error('同步失败');
+      }
+    } catch {
+      message.error('同步请求失败');
+    } finally {
+      setSyncingOrders(prev => { const s = new Set(prev); s.delete(orderNumber); return s; });
+    }
+  };
+
   const columns: ColumnsType<PaymentOrderInfo> = [
     {
       title: '订单号',
@@ -93,6 +117,22 @@ export default function OrderTable({
       key: 'paid_at',
       width: 180,
       render: (date: string | null) => date ? new Date(date).toLocaleString('zh-CN') : '-',
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 100,
+      render: (_, record) =>
+        record.status === 'pending' ? (
+          <Button
+            size="small"
+            icon={<SyncOutlined spin={syncingOrders.has(record.order_id)} />}
+            loading={syncingOrders.has(record.order_id)}
+            onClick={() => handleSync(record.order_id)}
+          >
+            同步
+          </Button>
+        ) : null,
     },
   ];
 

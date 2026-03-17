@@ -100,6 +100,7 @@ export default function PaymentsPage() {
           page={page}
           pageSize={pageSize}
           onPageChange={handlePageChange}
+          onRefresh={fetchOrders}
         />
       </Card>
     </div>

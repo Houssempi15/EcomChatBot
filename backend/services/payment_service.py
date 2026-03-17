@@ -292,7 +292,14 @@ class PaymentService:
                 return False
 
             if not self._gateway.verify_notify(notify_data):
-                logger.error("Alipay notify signature verification failed")
+                # 打印验签内容帮助排查
+                filtered = {k: v for k, v in notify_data.items() if k not in ("sign", "sign_type")}
+                sign_content = "&".join(f"{k}={v}" for k, v in sorted(filtered.items()))
+                logger.error(
+                    f"Alipay notify signature verification failed. "
+                    f"out_trade_no={notify_data.get('out_trade_no')}, "
+                    f"sign_content_preview={sign_content[:200]}"
+                )
                 return False
 
             out_trade_no = notify_data.get("out_trade_no")

@@ -72,4 +72,12 @@ export const adminPaymentsApi = {
     );
     return response.data;
   },
+
+  // Sync order status from Alipay
+  syncOrder: async (orderNumber: string): Promise<ApiResponse<{ message: string; order: unknown }>> => {
+    const response = await adminApiClient.post<ApiResponse<{ message: string; order: unknown }>>(
+      `/payment/admin/orders/${orderNumber}/sync`
+    );
+    return response.data;
+  },
 };

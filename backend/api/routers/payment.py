@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.dependencies import TenantFlexDep, DBDep
+from api.dependencies import TenantFlexDep, DBDep, AdminDep
 from models.payment import SubscriptionType, PaymentChannel
 from schemas.base import ApiResponse
 from services.payment_service import PaymentService, PLAN_CONFIG, ADDON_CONFIG
@@ -298,18 +298,27 @@ async def alipay_notify_callback(
         form_data = await request.form()
         notify_data = dict(form_data)
 
-        logger.info(f"Received alipay notify: {notify_data.get('out_trade_no')}")
+        logger.info(
+            f"Received alipay notify: out_trade_no={notify_data.get('out_trade_no')}, "
+            f"trade_status={notify_data.get('trade_status')}, "
+            f"app_id={notify_data.get('app_id')}, "
+            f"sign_type={notify_data.get('sign_type')}, "
+            f"has_sign={bool(notify_data.get('sign'))}, "
+            f"param_keys={sorted(notify_data.keys())}"
+        )
 
         payment_service = PaymentService(db)
         success = await payment_service.handle_alipay_notify(notify_data)
 
         if success:
+            logger.info(f"Alipay notify processed successfully: {notify_data.get('out_trade_no')}")
             return Response(content="success", media_type="text/plain")
         else:
+            logger.error(f"Alipay notify processing failed: {notify_data.get('out_trade_no')}")
             return Response(content="fail", media_type="text/plain", status_code=400)
 
     except Exception as e:
-        logger.error(f"Error handling alipay notify: {e}")
+        logger.error(f"Error handling alipay notify: {e}", exc_info=True)
         return Response(content="fail", media_type="text/plain", status_code=500)
 
 
@@ -601,3 +610,28 @@ async def purchase_addon(
     except Exception as e:
         logger.error(f"Error purchasing addon: {e}")
         raise HTTPException(status_code=500, detail=f"购买加量包失败: {str(e)}")
+
+
+# ===== 管理员接口 =====
+
+@router.post("/admin/orders/{order_number}/sync", summary="管理员手动同步订单状态")
+async def admin_sync_order(
+    order_number: str,
+    admin: AdminDep,
+    db: DBDep,
+):
+    """管理员手动向支付宝查询订单状态并更新本地记录"""
+    try:
+        payment_service = PaymentService(db)
+        order_info = await payment_service.query_order_status(order_number)
+
+        if not order_info:
+            raise HTTPException(status_code=404, detail="订单不存在")
+
+        return ApiResponse(data={"message": "订单状态已同步", "order": order_info})
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error syncing order: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"同步失败: {str(e)}")
