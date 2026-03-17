@@ -52,6 +52,13 @@ export default function PaymentsPage() {
     fetchOrders();
   }, [fetchOrders]);
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      fetchOrders();
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [fetchOrders]);
+
   const handleSearch = () => {
     setPage(1);
     fetchOrders();

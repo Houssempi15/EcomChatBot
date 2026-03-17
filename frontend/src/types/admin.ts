@@ -216,6 +216,8 @@ export interface PaymentOrderInfo {
   amount: number;
   payment_channel: string;
   status: PaymentOrderStatus;
+  plan_type: string;
+  subscription_type: string;
   created_at: string;
   paid_at: string | null;
 }

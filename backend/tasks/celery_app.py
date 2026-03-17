@@ -79,10 +79,10 @@ celery_app.conf.beat_schedule = {
         "task": "tasks.data_tasks.cleanup_expired_data",
         "schedule": 3600.0 * 24,  # 每24小时执行一次
     },
-    # 每小时同步订单状态
+    # 每5分钟同步订单状态
     "sync-order-status": {
         "task": "tasks.billing_tasks.sync_pending_orders",
-        "schedule": 3600.0,  # 每小时执行一次
+        "schedule": 300.0,  # 每5分钟执行一次
     },
     # 每天凌晨1点检查即将过期的订阅
     "check-expiring-subscriptions": {

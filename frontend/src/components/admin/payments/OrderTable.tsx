@@ -32,6 +32,22 @@ const paymentMethodLabels: Record<string, string> = {
   alipay: '支付宝',
 };
 
+const planTypeLabels: Record<string, string> = {
+  monthly: '月付',
+  quarterly: '季付',
+  semi_annual: '半年付',
+  annual: '年付',
+  image_addon: '图片加量包',
+  video_addon: '视频加量包',
+};
+
+const subscriptionTypeLabels: Record<string, string> = {
+  new: '新购',
+  renewal: '续费',
+  upgrade: '升级',
+  addon: '加量包',
+};
+
 export default function OrderTable({
   orders,
   loading,
@@ -67,6 +83,13 @@ export default function OrderTable({
       key: 'order_number',
       width: 180,
       ellipsis: true,
+    },
+    {
+      title: '类型',
+      key: 'type',
+      width: 140,
+      render: (_, record) =>
+        `${subscriptionTypeLabels[record.subscription_type] || record.subscription_type} · ${planTypeLabels[record.plan_type] || record.plan_type}`,
     },
     {
       title: '租户',
@@ -151,7 +174,7 @@ export default function OrderTable({
         showTotal: (total) => `共 ${total} 条`,
         onChange: onPageChange,
       }}
-      scroll={{ x: 1100 }}
+      scroll={{ x: 1240 }}
     />
   );
 }
