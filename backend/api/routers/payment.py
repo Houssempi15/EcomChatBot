@@ -574,20 +574,17 @@ async def purchase_addon(
     tenant_id: TenantFlexDep,
     db: DBDep,
 ):
-    """购买加量包，返回支付二维码"""
+    """购买加量包，返回支付宝跳转 URL"""
     if request_data.addon_type not in ADDON_CONFIG:
         raise HTTPException(status_code=400, detail=f"无效的加量包类型: {request_data.addon_type}")
 
-    channel_map = {"alipay": PaymentChannel.ALIPAY, "wechat": PaymentChannel.WECHAT}
-    channel = channel_map.get(request_data.payment_channel, PaymentChannel.ALIPAY)
-
     try:
-        payment_service = PaymentService(db, channel=channel)
-        order, qr_url = await payment_service.create_native_payment_order(
+        payment_service = PaymentService(db, channel=PaymentChannel.ALIPAY)
+        order, pay_url = await payment_service.create_page_payment_order(
             tenant_id=tenant_id,
             plan_type=request_data.addon_type,
             subscription_type=SubscriptionType.ADDON,
-            payment_channel=channel,
+            payment_channel=PaymentChannel.ALIPAY,
         )
 
         return ApiResponse(data={
@@ -595,8 +592,7 @@ async def purchase_addon(
             "order_number": order.order_number,
             "amount": float(order.amount),
             "currency": order.currency,
-            "payment_channel": channel.value,
-            "qr_code_url": qr_url,
+            "pay_url": pay_url,
             "expires_at": order.expired_at.isoformat(),
         })
 

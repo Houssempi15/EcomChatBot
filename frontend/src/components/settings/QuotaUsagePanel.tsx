@@ -10,7 +10,6 @@ import {
 } from '@ant-design/icons';
 import Skeleton from '@/components/ui/Loading/Skeleton';
 import { subscriptionApi, QuotaUsage, AddonPack } from '@/lib/api/subscription';
-import Image from 'next/image';
 
 const { Title, Text } = Typography;
 
@@ -102,11 +101,7 @@ export default function QuotaUsagePanel() {
   const [addonModalOpen, setAddonModalOpen] = useState(false);
   const [addonPacks, setAddonPacks] = useState<AddonPack[]>([]);
   const [selectedAddon, setSelectedAddon] = useState<string>('');
-  const [paymentChannel, setPaymentChannel] = useState<string>('alipay');
   const [purchasing, setPurchasing] = useState(false);
-  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
-  const [orderNumber, setOrderNumber] = useState<string>('');
-  const [pollTimer, setPollTimer] = useState<ReturnType<typeof setInterval> | null>(null);
 
   const fetchQuota = useCallback(() => {
     subscriptionApi
@@ -122,17 +117,8 @@ export default function QuotaUsagePanel() {
     fetchQuota();
   }, [fetchQuota]);
 
-  // 清理轮询定时器
-  useEffect(() => {
-    return () => {
-      if (pollTimer) clearInterval(pollTimer);
-    };
-  }, [pollTimer]);
-
   const handleOpenAddonModal = async () => {
     setAddonModalOpen(true);
-    setQrCodeUrl('');
-    setOrderNumber('');
     try {
       const res = await subscriptionApi.getAddonPacks();
       if (res.success && res.data) {
@@ -150,13 +136,11 @@ export default function QuotaUsagePanel() {
     try {
       const res = await subscriptionApi.purchaseAddon({
         addon_type: selectedAddon,
-        payment_channel: paymentChannel,
+        payment_channel: 'alipay',
       });
-      if (res.success && res.data) {
-        setQrCodeUrl(res.data.qr_code_url);
-        setOrderNumber(res.data.order_number);
-        // 开始轮询订单状态
-        startPolling(res.data.order_number);
+      if (res.success && res.data?.pay_url) {
+        setAddonModalOpen(false);
+        window.location.href = res.data.pay_url;
       } else {
         message.error('创建订单失败');
       }
@@ -167,35 +151,8 @@ export default function QuotaUsagePanel() {
     }
   };
 
-  const startPolling = (orderNum: string) => {
-    if (pollTimer) clearInterval(pollTimer);
-    const timer = setInterval(async () => {
-      try {
-        const res = await subscriptionApi.syncOrder(orderNum);
-        if (res.success && res.data?.order?.status === 'paid') {
-          clearInterval(timer);
-          setPollTimer(null);
-          message.success('支付成功！加量包余额已更新');
-          setQrCodeUrl('');
-          setOrderNumber('');
-          setAddonModalOpen(false);
-          fetchQuota();
-        }
-      } catch {
-        // 忽略轮询错误
-      }
-    }, 3000);
-    setPollTimer(timer);
-  };
-
   const handleCloseModal = () => {
-    if (pollTimer) {
-      clearInterval(pollTimer);
-      setPollTimer(null);
-    }
     setAddonModalOpen(false);
-    setQrCodeUrl('');
-    setOrderNumber('');
   };
 
   if (loading) {
@@ -256,66 +213,35 @@ export default function QuotaUsagePanel() {
         title="购买加量包"
         open={addonModalOpen}
         onCancel={handleCloseModal}
-        footer={qrCodeUrl ? null : undefined}
         onOk={handlePurchase}
-        okText="立即购买"
+        okText="支付宝付款"
         okButtonProps={{ loading: purchasing, disabled: !selectedAddon }}
         cancelText="取消"
       >
-        {qrCodeUrl ? (
-          <div className="text-center py-4">
-            <Text className="block mb-4">请使用{paymentChannel === 'alipay' ? '支付宝' : '微信'}扫码支付</Text>
-            <div className="inline-block p-4 bg-white border rounded-lg">
-              <Image
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrCodeUrl)}`}
-                alt="支付二维码"
-                width={200}
-                height={200}
-              />
-            </div>
-            <Text type="secondary" className="block mt-4 text-xs">
-              订单号: {orderNumber}
-            </Text>
-            <Text type="secondary" className="block text-xs">
-              支付完成后将自动刷新
-            </Text>
+        <div className="space-y-4">
+          <div>
+            <Text className="block mb-2 font-medium">选择加量包</Text>
+            <Radio.Group
+              value={selectedAddon}
+              onChange={(e) => setSelectedAddon(e.target.value)}
+              className="w-full"
+            >
+              <div className="space-y-2">
+                {addonPacks.map((pack) => (
+                  <Radio key={pack.addon_type} value={pack.addon_type} className="w-full">
+                    <div className="inline-flex items-center gap-2">
+                      <span>{pack.name}</span>
+                      <Tag color="orange">¥{pack.price}</Tag>
+                      <Text type="secondary" className="text-xs">
+                        {pack.credits} 次
+                      </Text>
+                    </div>
+                  </Radio>
+                ))}
+              </div>
+            </Radio.Group>
           </div>
-        ) : (
-          <div className="space-y-4">
-            <div>
-              <Text className="block mb-2 font-medium">选择加量包</Text>
-              <Radio.Group
-                value={selectedAddon}
-                onChange={(e) => setSelectedAddon(e.target.value)}
-                className="w-full"
-              >
-                <div className="space-y-2">
-                  {addonPacks.map((pack) => (
-                    <Radio key={pack.addon_type} value={pack.addon_type} className="w-full">
-                      <div className="inline-flex items-center gap-2">
-                        <span>{pack.name}</span>
-                        <Tag color="orange">¥{pack.price}</Tag>
-                        <Text type="secondary" className="text-xs">
-                          {pack.credits} 次
-                        </Text>
-                      </div>
-                    </Radio>
-                  ))}
-                </div>
-              </Radio.Group>
-            </div>
-            <div>
-              <Text className="block mb-2 font-medium">支付方式</Text>
-              <Radio.Group
-                value={paymentChannel}
-                onChange={(e) => setPaymentChannel(e.target.value)}
-              >
-                <Radio value="alipay">支付宝</Radio>
-                <Radio value="wechat">微信支付</Radio>
-              </Radio.Group>
-            </div>
-          </div>
-        )}
+        </div>
       </Modal>
     </>
   );
