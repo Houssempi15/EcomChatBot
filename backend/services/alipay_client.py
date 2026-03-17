@@ -98,7 +98,7 @@ def _build_sign_content(params: dict) -> str:
     """
     filtered = {
         k: v for k, v in params.items()
-        if v is not None and v != "" and k not in ("sign", "sign_type")
+        if v is not None and v != "" and k != "sign"
     }
     sorted_items = sorted(filtered.items())
     return "&".join(f"{k}={v}" for k, v in sorted_items)
