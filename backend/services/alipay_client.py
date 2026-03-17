@@ -250,7 +250,13 @@ class AlipayClient(PaymentGateway):
         if not sign:
             return False
 
-        content = _build_sign_content(params)
+        # 异步回调验签：需同时排除 sign 和 sign_type（与发起请求签名规则不同）
+        filtered = {
+            k: v for k, v in params.items()
+            if v is not None and v != "" and k not in ("sign", "sign_type")
+        }
+        sorted_items = sorted(filtered.items())
+        content = "&".join(f"{k}={v}" for k, v in sorted_items)
         return _rsa2_verify(self._public_key, content, sign)
 
     async def refund(
