@@ -454,6 +454,14 @@ class PaymentService:
     async def _activate_subscription(self, order: PaymentOrder) -> None:
         """激活订阅"""
         try:
+            # 先通过整数PK查出租户，获取 varchar 格式的 tenant_id
+            tenant_stmt = select(Tenant).where(Tenant.id == order.tenant_id)
+            tenant_result = await self.db.execute(tenant_stmt)
+            tenant = tenant_result.scalar_one_or_none()
+            if not tenant:
+                raise ValueError(f"Tenant not found: order.tenant_id={order.tenant_id}")
+            tenant_str_id = tenant.tenant_id  # varchar 业务 ID，供 Subscription 使用
+
             # 加量包订单：直接增加余额，不涉及订阅
             if order.subscription_type == SubscriptionType.ADDON:
                 from services.quota_service import QuotaService
@@ -461,42 +469,49 @@ class PaymentService:
                 pkg = ADDON_PACKAGES.get(order.plan_type)
                 if pkg:
                     await quota_service.add_addon_credits(
-                        tenant_id=str(order.tenant_id),
+                        tenant_id=tenant_str_id,
                         credit_type=pkg["credit_type"],
                         amount=pkg["credits"],
                     )
-                logger.info(f"Added addon credits for tenant: {order.tenant_id}, pack: {order.plan_type}")
+                logger.info(f"Added addon credits for tenant: {tenant_str_id}, pack: {order.plan_type}")
                 return
 
+            # 查询所有 active 订阅（可能有 trial + 旧订阅）
             stmt = select(Subscription).where(
-                Subscription.tenant_id == order.tenant_id,
+                Subscription.tenant_id == tenant_str_id,
                 Subscription.status == "active",
             )
             result = await self.db.execute(stmt)
-            current_subscription = result.scalar_one_or_none()
+            active_subscriptions = result.scalars().all()
+            current_subscription = active_subscriptions[0] if active_subscriptions else None
 
             now = datetime.now()
             days = self.get_plan_days(order.plan_type)
 
             if order.subscription_type == SubscriptionType.NEW:
+                # 将所有旧 active 订阅设为 inactive
+                for old_sub in active_subscriptions:
+                    old_sub.status = "inactive"
+
                 subscription = Subscription(
-                    tenant_id=order.tenant_id,
+                    tenant_id=tenant_str_id,
                     plan_type=order.plan_type,
                     start_date=now,
                     expire_at=now + timedelta(days=days),
                     status="active",
                 )
                 self.db.add(subscription)
-                logger.info(f"Created new subscription for tenant: {order.tenant_id}")
+                logger.info(f"Created new subscription for tenant: {tenant_str_id}")
 
             elif order.subscription_type == SubscriptionType.RENEWAL:
                 if current_subscription:
                     base = current_subscription.expire_at if current_subscription.expire_at > now else now
                     current_subscription.expire_at = base + timedelta(days=days)
-                    logger.info(f"Renewed subscription for tenant: {order.tenant_id}")
+                    current_subscription.plan_type = order.plan_type
+                    logger.info(f"Renewed subscription for tenant: {tenant_str_id}")
                 else:
                     subscription = Subscription(
-                        tenant_id=order.tenant_id,
+                        tenant_id=tenant_str_id,
                         plan_type=order.plan_type,
                         start_date=now,
                         expire_at=now + timedelta(days=days),
@@ -507,10 +522,11 @@ class PaymentService:
             elif order.subscription_type == SubscriptionType.UPGRADE:
                 if current_subscription:
                     current_subscription.plan_type = order.plan_type
-                    logger.info(f"Upgraded subscription for tenant: {order.tenant_id}")
+                    current_subscription.expire_at = now + timedelta(days=days)
+                    logger.info(f"Upgraded subscription for tenant: {tenant_str_id}")
                 else:
                     subscription = Subscription(
-                        tenant_id=order.tenant_id,
+                        tenant_id=tenant_str_id,
                         plan_type=order.plan_type,
                         start_date=now,
                         expire_at=now + timedelta(days=days),
@@ -519,11 +535,7 @@ class PaymentService:
                     self.db.add(subscription)
 
             # 更新租户当前套餐
-            tenant_stmt = select(Tenant).where(Tenant.id == order.tenant_id)
-            tenant_result = await self.db.execute(tenant_stmt)
-            tenant = tenant_result.scalar_one_or_none()
-            if tenant:
-                tenant.current_plan = order.plan_type
+            tenant.current_plan = order.plan_type
 
         except Exception as e:
             logger.error(f"Error activating subscription: {e}")
