@@ -26,13 +26,16 @@ logger = logging.getLogger(__name__)
 def _parse_alipay_response(resp) -> dict:
     """
     解析支付宝 HTTP 响应，兼容 UTF-8 / GBK 编码。
-    签名错误或网络异常时，支付宝可能返回 GBK 编码的 HTML 错误页。
+    某些错误响应（如签名错误）支付宝以 GBK 编码返回 JSON。
     """
-    try:
-        return json.loads(resp.content.decode("utf-8"))
-    except UnicodeDecodeError:
-        text = resp.content.decode("gbk", errors="replace")
-        raise RuntimeError(f"支付宝返回非 UTF-8 响应（可能为签名错误）: {text[:200]}")
+    for encoding in ("utf-8", "gbk"):
+        try:
+            return json.loads(resp.content.decode(encoding))
+        except UnicodeDecodeError:
+            continue
+        except json.JSONDecodeError:
+            break
+    raise RuntimeError(f"支付宝响应解析失败，原始内容: {resp.content[:300]}")
 
 
 def _load_private_key(key_str: str):
@@ -144,7 +147,9 @@ class AlipayClient(PaymentGateway):
         self._sign_params(params)
 
         async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.post(self.gateway, data=params)
+            # charset 必须在 URL query string 中，否则支付宝验签会失败
+            url = f"{self.gateway}?charset=utf-8"
+            resp = await client.post(url, data=params)
             resp.raise_for_status()
             result = _parse_alipay_response(resp)
 
@@ -180,7 +185,8 @@ class AlipayClient(PaymentGateway):
         self._sign_params(params)
 
         async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.post(self.gateway, data=params)
+            url = f"{self.gateway}?charset=utf-8"
+            resp = await client.post(url, data=params)
             resp.raise_for_status()
             result = _parse_alipay_response(resp)
 
