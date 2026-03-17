@@ -57,10 +57,17 @@ def create_adapter(
         except Exception:
             app_secret = config.app_secret
 
+    # 从 ISV 应用的 extra_config 中提取额外参数
+    extra_kwargs = {}
+    if app and app.extra_config:
+        if app.extra_config.get("sandbox"):
+            extra_kwargs["sandbox"] = True
+
     return adapter_cls(
         app_key=app_key,
         app_secret=app_secret,
         access_token=config.access_token,
+        **extra_kwargs,
     )
 
 

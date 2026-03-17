@@ -15,9 +15,15 @@ logger = logging.getLogger(__name__)
 class DouyinAdapter(BasePlatformAdapter):
     """抖音抖店平台适配器"""
 
-    def __init__(self, app_key: str, app_secret: str, access_token: str | None = None):
+    def __init__(
+        self,
+        app_key: str,
+        app_secret: str,
+        access_token: str | None = None,
+        sandbox: bool = False,
+    ):
         super().__init__(app_key, app_secret, access_token)
-        self.client = DouyinClient(app_key, app_secret)
+        self.client = DouyinClient(app_key, app_secret, sandbox=sandbox)
 
     def _parse_product(self, raw: dict) -> ProductDTO:
         """将抖音商品原始数据转为 ProductDTO"""

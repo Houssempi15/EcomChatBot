@@ -12,6 +12,7 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 logger = logging.getLogger(__name__)
 
 DOUYIN_API_URL = "https://openapi-fxg.jinritemai.com"
+DOUYIN_SANDBOX_API_URL = "https://openapi-fxg-sandbox.jinritemai.com"
 
 
 class DouyinAPIError(Exception):
@@ -21,10 +22,10 @@ class DouyinAPIError(Exception):
 class DouyinClient:
     """抖店开放平台 API 客户端"""
 
-    def __init__(self, app_key: str, app_secret: str):
+    def __init__(self, app_key: str, app_secret: str, sandbox: bool = False):
         self.app_key = app_key
         self.app_secret = app_secret
-        self.base_url = DOUYIN_API_URL
+        self.base_url = DOUYIN_SANDBOX_API_URL if sandbox else DOUYIN_API_URL
 
     @staticmethod
     def _normalize_param_json(params: dict[str, Any] | str) -> str:

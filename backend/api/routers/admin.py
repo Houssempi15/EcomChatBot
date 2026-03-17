@@ -27,6 +27,9 @@ from schemas import (
 from schemas.admin import AdminChangePasswordRequest
 from services import AdminService, AuditService, SubscriptionService, TenantService
 from core.permissions import SUBSCRIPTION_PLANS
+from core.crypto import decrypt_field, encrypt_field
+from models.platform_app import PlatformApp
+from schemas.platform import PlatformAppCreate, PlatformAppResponse, PlatformAppUpdate
 
 router = APIRouter(prefix="/admin", tags=["管理员"])
 
@@ -1236,4 +1239,212 @@ async def reject_bill(
     return ApiResponse(data={"message": "账单已拒绝", "reason": reason})
 
 
+# ============ ISV 平台应用管理 ============
+@router.get(
+    "/platform-apps",
+    response_model=ApiResponse[list[PlatformAppResponse]],
+)
+async def list_platform_apps(
+    admin: AdminDep,
+    db: DBDep,
+    status: str | None = None,
+):
+    """
+    获取所有 ISV 平台应用配置
+
+    权限：所有管理员
+    """
+    stmt = select(PlatformApp)
+    if status:
+        stmt = stmt.where(PlatformApp.status == status)
+    stmt = stmt.order_by(PlatformApp.created_at.desc())
+
+    result = await db.execute(stmt)
+    apps = result.scalars().all()
+    return ApiResponse(data=apps)
+
+
+@router.get(
+    "/platform-apps/{app_id}",
+    response_model=ApiResponse[PlatformAppResponse],
+)
+async def get_platform_app(
+    app_id: int,
+    admin: AdminDep,
+    db: DBDep,
+):
+    """
+    获取 ISV 平台应用详情
+
+    权限：所有管理员
+    """
+    stmt = select(PlatformApp).where(PlatformApp.id == app_id)
+    result = await db.execute(stmt)
+    app = result.scalar_one_or_none()
+    if not app:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="平台应用不存在")
+    return ApiResponse(data=app)
+
+
+@router.post(
+    "/platform-apps",
+    response_model=ApiResponse[PlatformAppResponse],
+    dependencies=[Depends(require_admin_permission(Permission.TENANT_CREATE))],
+)
+async def create_platform_app(
+    app_data: PlatformAppCreate,
+    admin: AdminDep,
+    db: DBDep,
+):
+    """
+    创建 ISV 平台应用配置
+
+    app_secret 会自动加密后存储。
+
+    权限：super_admin, support_admin
+    """
+    # 检查 platform_type 是否已存在
+    existing = await db.execute(
+        select(PlatformApp).where(PlatformApp.platform_type == app_data.platform_type)
+    )
+    if existing.scalar_one_or_none():
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail=f"平台 {app_data.platform_type} 的应用已存在")
+
+    app = PlatformApp(
+        platform_type=app_data.platform_type,
+        app_name=app_data.app_name,
+        app_key=app_data.app_key,
+        app_secret=encrypt_field(app_data.app_secret),
+        callback_url=app_data.callback_url,
+        webhook_url=app_data.webhook_url,
+        scopes=app_data.scopes,
+        status="active",
+        extra_config=app_data.extra_config,
+    )
+    db.add(app)
+    await db.commit()
+    await db.refresh(app)
+
+    # 审计日志
+    audit_service = AuditService(db)
+    await audit_service.log_operation(
+        admin_id=admin.admin_id,
+        operation_type="create_platform_app",
+        resource_type="platform_app",
+        resource_id=str(app.id),
+        operation_details={
+            "platform_type": app_data.platform_type,
+            "app_name": app_data.app_name,
+        },
+    )
+
+    return ApiResponse(data=app)
+
+
+@router.put(
+    "/platform-apps/{app_id}",
+    response_model=ApiResponse[PlatformAppResponse],
+    dependencies=[Depends(require_admin_permission(Permission.TENANT_CREATE))],
+)
+async def update_platform_app(
+    app_id: int,
+    update_data: PlatformAppUpdate,
+    admin: AdminDep,
+    db: DBDep,
+):
+    """
+    更新 ISV 平台应用配置
+
+    如果提供了 app_secret，会自动加密后存储。
+
+    权限：super_admin, support_admin
+    """
+    stmt = select(PlatformApp).where(PlatformApp.id == app_id)
+    result = await db.execute(stmt)
+    app = result.scalar_one_or_none()
+    if not app:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="平台应用不存在")
+
+    update_dict = update_data.model_dump(exclude_unset=True)
+    if "app_secret" in update_dict and update_dict["app_secret"]:
+        update_dict["app_secret"] = encrypt_field(update_dict["app_secret"])
+
+    for field, value in update_dict.items():
+        setattr(app, field, value)
+
+    await db.commit()
+    await db.refresh(app)
+
+    # 审计日志
+    audit_service = AuditService(db)
+    await audit_service.log_operation(
+        admin_id=admin.admin_id,
+        operation_type="update_platform_app",
+        resource_type="platform_app",
+        resource_id=str(app.id),
+        operation_details={
+            "platform_type": app.platform_type,
+            "updated_fields": list(update_dict.keys()),
+        },
+    )
+
+    return ApiResponse(data=app)
+
+
+@router.delete(
+    "/platform-apps/{app_id}",
+    response_model=ApiResponse[dict],
+    dependencies=[Depends(require_admin_permission(Permission.TENANT_CREATE))],
+)
+async def delete_platform_app(
+    app_id: int,
+    admin: AdminDep,
+    db: DBDep,
+):
+    """
+    删除 ISV 平台应用配置（物理删除）
+
+    注意：删除前请确保没有关联的租户配置在使用此应用。
+
+    权限：super_admin, support_admin
+    """
+    stmt = select(PlatformApp).where(PlatformApp.id == app_id)
+    result = await db.execute(stmt)
+    app = result.scalar_one_or_none()
+    if not app:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="平台应用不存在")
+
+    # 检查是否有关联的 PlatformConfig
+    from models.platform import PlatformConfig
+    config_stmt = select(func.count(PlatformConfig.id)).where(
+        PlatformConfig.platform_app_id == app_id
+    )
+    config_count = await db.scalar(config_stmt) or 0
+    if config_count > 0:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=400,
+            detail=f"该应用关联了 {config_count} 个租户配置，无法删除。请先断开相关连接。",
+        )
+
+    platform_type = app.platform_type
+
+    await db.delete(app)
+    await db.commit()
+
+    # 审计日志
+    audit_service = AuditService(db)
+    await audit_service.log_operation(
+        admin_id=admin.admin_id,
+        operation_type="delete_platform_app",
+        resource_type="platform_app",
+        resource_id=str(app_id),
+        operation_details={"platform_type": platform_type},
+    )
+
+    return ApiResponse(data={"message": "平台应用已删除"})
 
