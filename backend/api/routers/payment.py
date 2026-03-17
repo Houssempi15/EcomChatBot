@@ -413,6 +413,7 @@ async def list_payment_orders(
             "currency": order.currency,
             "status": order.status,
             "plan_type": order.plan_type,
+            "subscription_type": order.subscription_type.value if hasattr(order.subscription_type, 'value') else order.subscription_type,
             "payment_channel": order.payment_channel,
             "qr_code_url": order.qr_code_url,
             "paid_at": order.paid_at.isoformat() if order.paid_at else None,
