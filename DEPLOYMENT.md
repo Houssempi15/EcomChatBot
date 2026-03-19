@@ -52,7 +52,7 @@
 3. **访问系统**
 
    ```
-   https://ecomchat.cn
+   https://your-domain.com
    ```
 
 ## 手动部署
@@ -116,7 +116,7 @@ project/
 | 配置项 | 开发环境 | 生产环境 |
 |--------|---------|---------|
 | 协议 | HTTP | HTTPS |
-| 域名/IP | 本机IP (如 192.168.1.100) | ecomchat.cn |
+| 域名/IP | 本机IP (如 192.168.1.100) | your-domain.com |
 | WebSocket | ws:// | wss:// |
 | CORS | 允许所有来源 | 仅允许域名 |
 | DEBUG | true | false |

@@ -48,11 +48,9 @@ env/
 !.env.development
 !.env.production.template
 !backend/.env.example
-!backend/.env.development
 !backend/.env.production.template
 !frontend/.env.example
 !frontend/.env.development
-!frontend/.env.production
 
 # Database
 *.db

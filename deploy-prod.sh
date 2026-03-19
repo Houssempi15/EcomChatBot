@@ -26,7 +26,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 echo ""
 echo "✅ 生产环境部署完成！"
-echo "访问地址: https://ecomchat.cn"
+echo "访问地址: https://your-domain.com"
 echo ""
 echo "查看日志: docker compose logs -f"
 echo "停止服务: docker compose down"

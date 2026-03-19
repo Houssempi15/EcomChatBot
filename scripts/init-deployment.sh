@@ -143,7 +143,7 @@ LOG_LEVEL=INFO
 LOG_FORMAT=json
 
 # ============ CORS配置 ============
-CORS_ORIGINS=["http://localhost:3000","https://www.ecomchat.cn"]
+CORS_ORIGINS=["http://localhost:3000","https://your-domain.com"]
 
 # ============ 限流配置 ============
 RATE_LIMIT_ENABLED=true
@@ -154,7 +154,7 @@ ENABLE_METRICS=true
 ENABLE_TRACING=false
 
 # ============ 支付宝回调 URL ============
-ALIPAY_NOTIFY_URL=https://www.ecomchat.cn/api/v1/payment/callback/alipay/notify
+ALIPAY_NOTIFY_URL=https://your-domain.com/api/v1/payment/callback/alipay/notify
 EOF
 
     chmod 600 "$ENV_FILE"
@@ -315,7 +315,7 @@ echo "     - SCM: Git (develop分支)"
 echo "     - Script Path: Jenkinsfile"
 echo ""
 echo "  4. 配置Git Webhook:"
-echo "     - URL: http://115.190.75.88:8080/generic-webhook-trigger/invoke?token=ecom-chatbot-deploy-token"
+echo "     - URL: http://your-jenkins-server:8080/generic-webhook-trigger/invoke?token=your-deploy-token"
 echo "     - Events: Push events"
 echo "     - Branch: develop"
 echo ""

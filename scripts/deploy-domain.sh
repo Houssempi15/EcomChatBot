@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# 域名部署脚本 - ecomchat.cn
+# 域名部署脚本 - your-domain.com
 # 用途：自动化部署流程
 
 set -e  # 遇到错误立即退出
 
 echo "========================================="
 echo "电商智能客服系统 - 域名部署脚本"
-echo "域名: ecomchat.cn"
+echo "域名: your-domain.com"
 echo "========================================="
 echo ""
 
@@ -37,17 +37,17 @@ fi
 
 # 步骤 1: 检查 SSL 证书
 echo -e "${YELLOW}[1/6] 检查 SSL 证书...${NC}"
-if [ ! -f "/etc/letsencrypt/live/ecomchat.cn/fullchain.pem" ]; then
+if [ ! -f "/etc/letsencrypt/live/your-domain.com/fullchain.pem" ]; then
     echo -e "${RED}错误: SSL 证书不存在${NC}"
     echo "请先运行以下命令获取证书:"
-    echo "sudo certbot certonly --standalone -d ecomchat.cn -d www.ecomchat.cn --email your-email@example.com --agree-tos"
+    echo "sudo certbot certonly --standalone -d your-domain.com -d www.your-domain.com --email your-email@example.com --agree-tos"
     exit 1
 fi
 echo -e "${GREEN}✓ SSL 证书存在${NC}"
 
 # 步骤 2: 检查证书有效期
 echo -e "${YELLOW}[2/6] 检查证书有效期...${NC}"
-CERT_EXPIRY=$(openssl x509 -enddate -noout -in /etc/letsencrypt/live/ecomchat.cn/fullchain.pem | cut -d= -f2)
+CERT_EXPIRY=$(openssl x509 -enddate -noout -in /etc/letsencrypt/live/your-domain.com/fullchain.pem | cut -d= -f2)
 CERT_EXPIRY_EPOCH=$(date -d "$CERT_EXPIRY" +%s)
 CURRENT_EPOCH=$(date +%s)
 DAYS_LEFT=$(( ($CERT_EXPIRY_EPOCH - $CURRENT_EPOCH) / 86400 ))
@@ -92,7 +92,7 @@ done
 # 测试 HTTP 重定向
 echo ""
 echo -e "${YELLOW}测试 HTTP → HTTPS 重定向...${NC}"
-HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L http://ecomchat.cn)
+HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L http://your-domain.com)
 if [ "$HTTP_STATUS" == "200" ]; then
     echo -e "${GREEN}✓ HTTP 重定向正常${NC}"
 else
@@ -101,7 +101,7 @@ fi
 
 # 测试 HTTPS 访问
 echo -e "${YELLOW}测试 HTTPS 访问...${NC}"
-HTTPS_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://ecomchat.cn)
+HTTPS_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://your-domain.com)
 if [ "$HTTPS_STATUS" == "200" ]; then
     echo -e "${GREEN}✓ HTTPS 访问正常${NC}"
 else
@@ -110,7 +110,7 @@ fi
 
 # 测试健康检查
 echo -e "${YELLOW}测试健康检查端点...${NC}"
-HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://ecomchat.cn/health)
+HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://your-domain.com/health)
 if [ "$HEALTH_STATUS" == "200" ]; then
     echo -e "${GREEN}✓ 健康检查正常${NC}"
 else
@@ -123,9 +123,9 @@ echo -e "${GREEN}部署完成！${NC}"
 echo -e "${GREEN}=========================================${NC}"
 echo ""
 echo "访问地址:"
-echo "  - 前端: https://ecomchat.cn"
-echo "  - API 文档: https://ecomchat.cn/docs"
-echo "  - 健康检查: https://ecomchat.cn/health"
+echo "  - 前端: https://your-domain.com"
+echo "  - API 文档: https://your-domain.com/docs"
+echo "  - 健康检查: https://your-domain.com/health"
 echo ""
 echo "查看日志:"
 echo "  docker compose logs -f nginx"

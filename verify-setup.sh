@@ -95,7 +95,7 @@ else
     exit 1
 fi
 
-if grep -q "wss://ecomchat.cn" frontend/.env.production; then
+if grep -q "wss://your-domain.com" frontend/.env.production; then
     echo "  ✓ 前端生产环境 WebSocket 配置正确"
 else
     echo "  ✗ 前端生产环境 WebSocket 配置错误"

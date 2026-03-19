@@ -601,36 +601,36 @@ MINIO_SECRET_KEY=minioadmin
 MINIO_BUCKET=ecom-chatbot
 ```
 
-### 火山引擎模型配置
+# 火山引擎模型配置
 
-系统使用火山引擎提供的 AI 模型服务，需要配置以下环境变量：
+系统使用火山引擎提供的 AI 模型服务，需要在 [火山引擎控制台](https://console.volcengine.com/ark) 的「推理接入点」中创建 Endpoint，获取 Endpoint ID 后填入对应环境变量：
 
 ```env
 # 火山引擎 API 配置
-VOLCENGINE_API_KEY=your-api-key-here
+VOLCENGINE_API_KEY=your-volcengine-api-key-here
 VOLCENGINE_API_BASE=https://ark.cn-beijing.volces.com/api/v3
 
-# LLM 大语言模型
+# LLM 大语言模型（在控制台创建 Endpoint 后获取 ID）
 LLM_PROVIDER=volcengine
-LLM_MODEL=deepseek-v3-2-251201
+LLM_MODEL=your-llm-model-endpoint-id
 LLM_TEMPERATURE=0.7
 LLM_MAX_TOKENS=2000
 
 # Embedding 向量模型
 EMBEDDING_PROVIDER=volcengine
-EMBEDDING_MODEL=doubao-embedding-vision-251215
+EMBEDDING_MODEL=your-embedding-model-endpoint-id
 EMBEDDING_DIMENSION=2048
 
 # 图片生成模型
 IMAGE_GEN_PROVIDER=volcengine
-IMAGE_GEN_MODEL=doubao-seedream-5-0-260128
+IMAGE_GEN_MODEL=your-image-gen-model-endpoint-id
 
 # 视频生成模型
 VIDEO_GEN_PROVIDER=volcengine
-VIDEO_GEN_MODEL=doubao-seedance-1-5-pro-251215
+VIDEO_GEN_MODEL=your-video-gen-model-endpoint-id
 ```
 
-请在 `.env.local` 文件中配置实际的 API Key。
+请在 `.env.local` 文件中配置实际的 API Key 和 Endpoint ID。
 
 ## 🧪 测试
 

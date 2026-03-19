@@ -7,7 +7,7 @@ set -e
 
 echo "========================================="
 echo "Let's Encrypt SSL 证书获取脚本"
-echo "域名: ecomchat.cn, www.ecomchat.cn"
+echo "域名: your-domain.com, www.your-domain.com"
 echo "========================================="
 echo ""
 
@@ -50,8 +50,8 @@ fi
 # 获取证书
 echo -e "${YELLOW}正在获取 SSL 证书...${NC}"
 certbot certonly --standalone \
-    -d ecomchat.cn \
-    -d www.ecomchat.cn \
+    -d your-domain.com \
+    -d www.your-domain.com \
     --email "$EMAIL" \
     --agree-tos \
     --non-interactive
@@ -60,8 +60,8 @@ if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ SSL 证书获取成功${NC}"
     echo ""
     echo "证书文件位置:"
-    echo "  - 完整证书链: /etc/letsencrypt/live/ecomchat.cn/fullchain.pem"
-    echo "  - 私钥: /etc/letsencrypt/live/ecomchat.cn/privkey.pem"
+    echo "  - 完整证书链: /etc/letsencrypt/live/your-domain.com/fullchain.pem"
+    echo "  - 私钥: /etc/letsencrypt/live/your-domain.com/privkey.pem"
     echo ""
 
     # 显示证书信息
